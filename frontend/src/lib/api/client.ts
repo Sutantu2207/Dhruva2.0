@@ -1,0 +1,107 @@
+/**
+ * Dhruva.AI V2 — Typed HTTP API Client with Error Envelope Unwrapping
+ */
+
+import { ApiErrorResponse, ApiResponse, ErrorBody } from '@/types/api';
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
+export class ApiError extends Error {
+  code: string;
+  details: Array<{ field?: string; issue: string }>;
+  requestId: string;
+  statusCode: number;
+
+  constructor(body: ErrorBody, statusCode: number) {
+    super(body.message);
+    this.name = 'ApiError';
+    this.code = body.code;
+    this.details = body.details;
+    this.requestId = body.request_id;
+    this.statusCode = statusCode;
+  }
+}
+
+class HttpClient {
+  private token: string | null = null;
+
+  setToken(token: string | null) {
+    this.token = token;
+  }
+
+  async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...((options.headers as Record<string, string>) || {}),
+    };
+
+    if (this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    const config: RequestInit = {
+      ...options,
+      headers,
+      credentials: 'include', // Support HttpOnly cookies
+    };
+
+    const response = await fetch(url, config);
+
+    // Handle 204 No Content
+    if (response.status === 204) {
+      return {} as T;
+    }
+
+    const data = await response.json();
+
+    if (!response.ok || data.success === false) {
+      const err = data as ApiErrorResponse;
+      const errorBody: ErrorBody = err.error || {
+        code: 'HTTP_ERROR',
+        message: response.statusText || 'Request failed',
+        details: [],
+        request_id: 'req_client_unknown',
+      };
+      throw new ApiError(errorBody, response.status);
+    }
+
+    const successData = data as ApiResponse<T>;
+    return successData.data;
+  }
+
+  get<T>(endpoint: string, options?: RequestInit): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'GET' });
+  }
+
+  post<T>(endpoint: string, body?: unknown, options?: RequestInit): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  put<T>(endpoint: string, body?: unknown, options?: RequestInit): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: 'PUT',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  patch<T>(endpoint: string, body?: unknown, options?: RequestInit): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: 'PATCH',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  }
+
+  delete<T>(endpoint: string, options?: RequestInit): Promise<T> {
+    return this.request<T>(endpoint, { ...options, method: 'DELETE' });
+  }
+}
+
+export const api = new HttpClient();
