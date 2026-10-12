@@ -97,6 +97,7 @@ async def login(
     user_dto = UserResponse(
         id=user.id,
         institution_id=user.institution_id,
+        institution_slug=user.institution.slug if user.institution else None,
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,
@@ -156,6 +157,7 @@ async def refresh_token(
     user_dto = UserResponse(
         id=user.id,
         institution_id=user.institution_id,
+        institution_slug=user.institution.slug if user.institution else None,
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,
@@ -223,6 +225,7 @@ async def get_me(
     user_dto = UserResponse(
         id=user.id,
         institution_id=user.institution_id,
+        institution_slug=user.institution.slug if user.institution else None,
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,

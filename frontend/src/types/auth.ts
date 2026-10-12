@@ -23,6 +23,7 @@ export interface Institution {
 export interface User {
   id: string;
   institution_id?: string | null;
+  institution_slug?: string | null;
   email: string;
   first_name: string;
   last_name: string;

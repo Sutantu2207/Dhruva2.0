@@ -29,6 +29,7 @@ class RoleResponse(BaseModel):
 class UserResponse(BaseModel):
     id: uuid.UUID
     institution_id: Optional[uuid.UUID] = None
+    institution_slug: Optional[str] = None
     email: str
     first_name: str
     last_name: str

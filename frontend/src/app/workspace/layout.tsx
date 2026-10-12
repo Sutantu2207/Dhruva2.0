@@ -96,13 +96,27 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
                 alignItems: 'center',
                 padding: '8px 12px',
                 borderRadius: 'var(--radius-md)',
+                color: 'var(--text-secondary)',
+                fontWeight: 500,
+                fontSize: '13px',
+              }}
+            >
+              Foundation Overview
+            </a>
+            <a
+              href="/workspace/academic"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '8px 12px',
+                borderRadius: 'var(--radius-md)',
                 backgroundColor: 'var(--brand-primary-subtle)',
                 color: 'var(--brand-primary)',
                 fontWeight: 500,
                 fontSize: '13px',
               }}
             >
-              Foundation Overview
+              Academic Structure
             </a>
 
             {/* Role indicator */}
