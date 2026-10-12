@@ -11,6 +11,7 @@ from src.infrastructure.persistence.postgres.base import Base
 import src.domain.identity.models  # registers Institution, User, Role, UserRole, RefreshToken
 import src.domain.audit.models     # registers AuditLog
 import src.domain.academic.models  # registers Departments, Programs, AcademicYears, Semesters, Batches, Sections, Courses, Offerings, Enrollments, Students, Faculty
+import src.domain.curriculum.models  # registers Curriculums, Modules, Lessons, LearningResources
 
 config = context.config
 settings = get_settings()

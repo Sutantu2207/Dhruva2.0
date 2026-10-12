@@ -110,14 +110,29 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
                 alignItems: 'center',
                 padding: '8px 12px',
                 borderRadius: 'var(--radius-md)',
-                backgroundColor: 'var(--brand-primary-subtle)',
-                color: 'var(--brand-primary)',
+                color: 'var(--text-secondary)',
                 fontWeight: 500,
                 fontSize: '13px',
               }}
             >
               Academic Structure
             </a>
+            <a
+              href="/workspace/curriculum"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                padding: '8px 12px',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--brand-primary-subtle)',
+                color: 'var(--brand-primary)',
+                fontWeight: 500,
+                fontSize: '13px',
+              }}
+            >
+              Curriculum & Syllabus
+            </a>
+
 
             {/* Role indicator */}
             <div style={{ padding: '12px 12px 4px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' }}>
