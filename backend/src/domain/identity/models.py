@@ -88,6 +88,12 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     def full_name(self) -> str:
         return f"{self.first_name} {self.last_name}".strip()
 
+    @property
+    def roles(self) -> List[str]:
+        if not hasattr(self, "user_roles") or not self.user_roles:
+            return []
+        return [ur.role.code for ur in self.user_roles if getattr(ur, "role", None)]
+
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email}, status={self.status})>"
 

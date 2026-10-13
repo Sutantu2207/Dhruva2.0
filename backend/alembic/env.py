@@ -13,6 +13,7 @@ import src.domain.audit.models     # registers AuditLog
 import src.domain.academic.models  # registers Departments, Programs, AcademicYears, Semesters, Batches, Sections, Courses, Offerings, Enrollments, Students, Faculty
 import src.domain.curriculum.models  # registers Curriculums, Modules, Lessons, LearningResources
 import src.domain.ingestion.models   # registers DataSource, ImportBatch, StagedRecord, ValidationResult, Approval, ProvenanceRecord
+import src.domain.assessment.models  # registers QuestionBank, Question, Assessment, AssessmentQuestion, AssessmentSubmission, AssessmentResult
 
 config = context.config
 settings = get_settings()

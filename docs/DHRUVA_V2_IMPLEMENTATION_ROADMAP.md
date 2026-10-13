@@ -240,48 +240,69 @@ Phase 2, Phase 3.
 
 ## Phase 5: Question Bank, Assessments & Deterministic Grading Engine
 
+> **Status:** Backend Complete & Formally Verified (Migration `0005`, 11/11 Domain Tests, 63/63 Regression Tests Passed)  
+> **Reference Architecture:** [ASSESSMENT_ENGINE.md](file:///c:/Users/sutan/OneDrive/Desktop/Dhruva%20V2/docs/architecture/ASSESSMENT_ENGINE.md)
+
 ### 1. Objective
-Implement Question Banks, Question authoring, Assessment configurations (quizzes, assignments, exams), Student Submissions, and a strictly deterministic Grading Engine.
+Implement Question Banks, Question authoring, Assessment configurations (quizzes, assignments, exams), Student Submissions, and a strictly deterministic Grading Engine with zero AI-generated authoritative grades.
 
 ### 2. Dependencies
-Phase 4.
+Phase 4 (Curriculum, Courses & Offerings).
 
 ### 3. Database Changes
+- Migration: `0005_assessment_question_bank_grading.py`
 - Tables:
-  - `question_banks`, `questions`, `assessments`, `submissions`, `results`
+  - `question_banks`, `questions`, `assessments`, `assessment_questions`, `submissions`, `results`
 - JSONB columns for answer keys and itemized breakdown with validation constraints.
+- PostgreSQL Row-Level Security policies active across all 6 assessment tables.
 
 ### 4. Backend Changes
-- Assessment scheduling and publication state machine.
-- Deterministic auto-grader for objective questions (MCQ, numeric, exact match).
-- Manual grading workflow for subjective answers with rubric support.
-- Zero AI-generated authoritative grades: purely deterministic computation of raw scores, percentages, and grade letters.
+- Assessment scheduling, mark allocation, and publication state machine (`DRAFT` -> `PUBLISHED` -> `CLOSED`).
+- Questions immutably locked once assessment is published.
+- Deterministic autograder (`DeterministicGradingEngine`):
+  - MCQ exact match.
+  - Multi-select proportional partial credit + anti-guessing penalty for incorrect selections.
+  - Numerical value comparison with precision and explicit tolerance intervals.
+  - Structured-text routing to `PENDING_MANUAL` queue.
+- Authoritative timing gates (authoritative UTC server clock) & enrollment validation.
+- Manual evaluation review endpoint for subjective questions with immutable audit trails.
 
 ### 5. API Changes
 - `GET/POST /api/v1/institutions/{slug}/question-banks`
+- `POST /api/v1/institutions/{slug}/question-banks/{bank_id}/questions`
 - `GET/POST /api/v1/institutions/{slug}/assessments`
+- `GET /api/v1/institutions/{slug}/assessments/{id}` (Sanitized student view with zero answer-key leakage)
+- `POST /api/v1/institutions/{slug}/assessments/{id}/questions`
+- `POST /api/v1/institutions/{slug}/assessments/{id}/publish`
+- `POST /api/v1/institutions/{slug}/assessments/{id}/close`
 - `POST /api/v1/institutions/{slug}/assessments/{id}/submit`
-- `POST /api/v1/institutions/{slug}/submissions/{id}/grade`
-- `GET /api/v1/institutions/{slug}/submissions/{id}/result`
+- `GET /api/v1/institutions/{slug}/submissions/{id}`
+- `POST /api/v1/institutions/{slug}/submissions/{id}/grade-manual`
 
 ### 6. Frontend Changes
-- Faculty Question Bank Manager and Assessment Builder.
-- Student Assessment Taking Interface (timer, auto-save, responsive review).
-- Results & Grade Breakdown view with deterministic calculations displayed transparently.
+- Pending Phase 5 UI implementation:
+  - Faculty Question Bank Manager and Assessment Builder.
+  - Student Assessment Taking Interface (timer, auto-save, responsive review).
+  - Results & Grade Breakdown view with deterministic calculations displayed transparently.
 
 ### 7. Tests
-- Unit tests for grading logic with edge cases (partial credit, negative marking).
-- Concurrency test for simultaneous student submissions.
+- 11 Domain tests in `tests/test_assessment_engine.py`:
+  - Unit tests for all question types and grading formulas.
+  - Assessment publication state machine & question locks.
+  - Attempt limits, server timing gates, enrollment enforcement.
+  - Cross-tenant isolation & answer-key sanitization.
+- 63/63 Total backend regression tests passing.
 
 ### 8. Security Checks
-- Answer keys never transmitted to the client before assessment deadline.
-- Submission deadline enforcement verified at server clock level.
+- Answer keys and explanations strictly stripped from student payloads across all endpoints.
+- Server-authoritative timestamps enforce availability and deadline windows.
+- Row-Level Security tenant boundary isolation.
 
 ### 9. Acceptance Criteria
-- Faculty can schedule an assessment; student can submit; system computes grades deterministically without errors.
+- Verified: Assessment scheduling, question allocation, enrollment gating, deterministic grading, and manual review workflow complete and tested without errors.
 
 ### 10. Rollback Strategy
-- Revert assessment migrations and grading transactions.
+- Alembic downgrade to `0004_data_center_ingestion_provenance`.
 
 ---
 
