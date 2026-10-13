@@ -2,12 +2,14 @@
   "name": "dhruva-frontend",
   "version": "2.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test \"src/__tests__/**/*.test.ts\""
   },
   "dependencies": {
     "clsx": "^2.1.1",

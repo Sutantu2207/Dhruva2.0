@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
 
   useEffect(() => {
@@ -36,6 +37,13 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
   if (!user) return null;
 
   const primaryRole = user.roles[0] || 'STUDENT';
+
+  const navItems = [
+    { href: '/workspace', label: 'Foundation Overview' },
+    { href: '/workspace/academic', label: 'Academic Structure' },
+    { href: '/workspace/curriculum', label: 'Curriculum & Syllabus' },
+    { href: '/workspace/datacenter', label: 'Data Center & Ingestion' },
+  ];
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
@@ -89,49 +97,28 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
 
           {/* Navigation Links */}
           <nav style={{ padding: '16px 8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <a
-              href="/workspace"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '8px 12px',
-                borderRadius: 'var(--radius-md)',
-                color: 'var(--text-secondary)',
-                fontWeight: 500,
-                fontSize: '13px',
-              }}
-            >
-              Foundation Overview
-            </a>
-            <a
-              href="/workspace/academic"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '8px 12px',
-                borderRadius: 'var(--radius-md)',
-                color: 'var(--text-secondary)',
-                fontWeight: 500,
-                fontSize: '13px',
-              }}
-            >
-              Academic Structure
-            </a>
-            <a
-              href="/workspace/curriculum"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                padding: '8px 12px',
-                borderRadius: 'var(--radius-md)',
-                backgroundColor: 'var(--brand-primary-subtle)',
-                color: 'var(--brand-primary)',
-                fontWeight: 500,
-                fontSize: '13px',
-              }}
-            >
-              Curriculum & Syllabus
-            </a>
+            {navItems.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    padding: '8px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    backgroundColor: isActive ? 'var(--brand-primary-subtle)' : 'transparent',
+                    color: isActive ? 'var(--brand-primary)' : 'var(--text-secondary)',
+                    fontWeight: isActive ? 600 : 500,
+                    fontSize: '13px',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {item.label}
+                </a>
+              );
+            })}
 
 
             {/* Role indicator */}
