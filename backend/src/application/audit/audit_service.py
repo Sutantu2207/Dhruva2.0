@@ -63,3 +63,6 @@ class AuditService:
                 extra={"request_id": request_id},
             )
             return None
+
+    # Alias for flexibility
+    log_action = log_event

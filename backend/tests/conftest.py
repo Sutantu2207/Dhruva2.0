@@ -24,6 +24,9 @@ from src.core.config import get_settings
 from src.core.security import hash_password
 from src.domain.identity.models import Institution, Role, User, UserRole
 from src.domain.identity.roles import SystemRole, get_permissions_for_role
+import src.domain.academic.models
+import src.domain.curriculum.models
+import src.domain.ingestion.models
 from src.infrastructure.persistence.postgres.base import Base
 from src.infrastructure.persistence.postgres.database import get_db_session
 from src.main import app
