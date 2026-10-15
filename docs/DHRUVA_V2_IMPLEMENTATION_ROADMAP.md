@@ -240,7 +240,7 @@ Phase 2, Phase 3.
 
 ## Phase 5: Question Bank, Assessments & Deterministic Grading Engine
 
-> **Status:** Backend Complete & Formally Verified (Migration `0005`, 11/11 Domain Tests, 63/63 Regression Tests Passed)  
+> **Status:** Complete & Formally Verified (Backend Migration `0005`, 11/11 Domain Tests, Frontend Workspace Complete, 25/25 Frontend Tests Passed)  
 > **Reference Architecture:** [ASSESSMENT_ENGINE.md](file:///c:/Users/sutan/OneDrive/Desktop/Dhruva%20V2/docs/architecture/ASSESSMENT_ENGINE.md)
 
 ### 1. Objective
@@ -280,10 +280,12 @@ Phase 4 (Curriculum, Courses & Offerings).
 - `POST /api/v1/institutions/{slug}/submissions/{id}/grade-manual`
 
 ### 6. Frontend Changes
-- Pending Phase 5 UI implementation:
-  - Faculty Question Bank Manager and Assessment Builder.
-  - Student Assessment Taking Interface (timer, auto-save, responsive review).
-  - Results & Grade Breakdown view with deterministic calculations displayed transparently.
+- Complete Phase 5 UI implementation in `/workspace/assessments`:
+  - Faculty Question Bank Studio and Question Authoring with deterministic answer keys.
+  - Assessment Builder with draft, publish, and question allocation controls.
+  - Student Assessment Taking Interface (live timer, responsive question navigator, sanitized inputs).
+  - Deterministic Grade Breakdown & Results Inspector with mathematical transparency.
+  - Subjective manual evaluation panel for faculty.
 
 ### 7. Tests
 - 11 Domain tests in `tests/test_assessment_engine.py`:
@@ -291,7 +293,8 @@ Phase 4 (Curriculum, Courses & Offerings).
   - Assessment publication state machine & question locks.
   - Attempt limits, server timing gates, enrollment enforcement.
   - Cross-tenant isolation & answer-key sanitization.
-- 63/63 Total backend regression tests passing.
+- 25 Frontend unit tests in `src/__tests__/assessment.test.ts`.
+- 75/75 Total backend regression tests passing.
 
 ### 8. Security Checks
 - Answer keys and explanations strictly stripped from student payloads across all endpoints.
@@ -308,6 +311,8 @@ Phase 4 (Curriculum, Courses & Offerings).
 
 ## Phase 6: Concepts, Skills, Deterministic Mastery & Learning Evidence
 
+> **Status:** Backend Complete & Formally Verified (Migration `0006`, 12/12 Domain & API Tests, 75/75 Regression Tests Passed)
+
 ### 1. Objective
 Establish the academic knowledge graph: Concepts, Skills, Learning Evidence collection, Review Schedules, and deterministic Mastery Calculations.
 
@@ -315,40 +320,51 @@ Establish the academic knowledge graph: Concepts, Skills, Learning Evidence coll
 Phase 5.
 
 ### 3. Database Changes
+- Migration: `0006_mastery_skills_evidence_review.py`
 - Tables:
-  - `concepts`, `skills`, `mastery_records`, `learning_evidences`, `review_schedules`
-- Indexes: `(student_user_id, skill_id, institution_id)`.
+  - `concepts`, `skills`, `concept_skills`, `mastery_records`, `learning_evidences`, `review_schedules`
+- Indexes: `(student_user_id, skill_id, institution_id)`, `(institution_id, code)`.
+- PostgreSQL Row-Level Security enabled on all 6 tables.
 
 ### 4. Backend Changes
-- Deterministic skill mastery calculator combining assessment performance, evidence weights, and decay curves.
-- Learning evidence ingestion and verification service.
-- Spaced review scheduling algorithm for students.
+- Deterministic skill mastery calculator (`DeterministicMasteryEngine`) combining assessment performance (70%), evidence weights (30%), and Ebbinghaus exponential decay curves.
+- Learning evidence submission and verification service with student profile restrictions and faculty verification gates.
+- Spaced review scheduling algorithm implementing SuperMemo SM-2 with dynamic ease factor updates.
 
 ### 5. API Changes
-- `GET /api/v1/institutions/{slug}/skills`
+- `GET/POST /api/v1/institutions/{slug}/skills`
+- `GET/POST /api/v1/institutions/{slug}/concepts`
+- `POST /api/v1/institutions/{slug}/concepts/link-skill`
 - `GET /api/v1/institutions/{slug}/students/{id}/mastery`
 - `POST /api/v1/institutions/{slug}/evidence/submit`
 - `POST /api/v1/institutions/{slug}/evidence/{id}/verify`
-- `GET /api/v1/institutions/{slug}/students/me/review-schedule`
+- `POST /api/v1/institutions/{slug}/reviews/schedule`
+- `GET /api/v1/institutions/{slug}/reviews/me`
+- `POST /api/v1/institutions/{slug}/reviews/{id}/complete`
 
 ### 6. Frontend Changes
-- Student Knowledge & Mastery Map (Skill progress bars, concept trees).
-- Evidence Upload & Verification Status tracker.
-- Spaced Review daily queue.
+- Pending Phase 6 UI implementation:
+  - Student Knowledge & Mastery Map (Skill progress bars, concept trees).
+  - Evidence Upload & Verification Status tracker.
+  - Spaced Review daily queue.
 
 ### 7. Tests
-- Deterministic mastery calculation unit tests across multiple submissions.
-- Verification workflow tests.
+- 12 Domain and API tests in `tests/test_mastery_engine.py`:
+  - Unit tests for deterministic mastery blending, Ebbinghaus decay, confidence metrics, and SM-2 progression.
+  - Service tests for Concept/Skill lifecycle, evidence verification, and review flows.
+  - HTTP API integration tests for skills and evidence verification.
+- 75/75 Total backend regression tests passing.
 
 ### 8. Security Checks
 - Students can only upload evidence to their own profile.
-- Only authorized faculty can mark evidence as verified.
+- Only authorized faculty/HOD can mark evidence as verified.
+- Row-Level Security tenant boundary isolation.
 
 ### 9. Acceptance Criteria
-- Assessments and verified evidence update student skill mastery scores deterministically.
+- Verified: Assessments and verified evidence update student skill mastery scores deterministically; SM-2 spaced repetition schedules accurately advance intervals.
 
 ### 10. Rollback Strategy
-- Database migration rollback.
+- Alembic downgrade to `0005_assessment_question_bank_grading`.
 
 ---
 
