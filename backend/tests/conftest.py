@@ -28,6 +28,7 @@ import src.domain.academic.models
 import src.domain.curriculum.models
 import src.domain.ingestion.models
 import src.domain.assessment.models
+import src.domain.mastery.models
 from src.infrastructure.persistence.postgres.base import Base
 from src.infrastructure.persistence.postgres.database import get_db_session
 from src.main import app

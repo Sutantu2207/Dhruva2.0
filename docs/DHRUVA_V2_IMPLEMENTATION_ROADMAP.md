@@ -311,7 +311,7 @@ Phase 4 (Curriculum, Courses & Offerings).
 
 ## Phase 6: Concepts, Skills, Deterministic Mastery & Learning Evidence
 
-> **Status:** Backend Complete & Formally Verified (Migration `0006`, 12/12 Domain & API Tests, 75/75 Regression Tests Passed)
+> **Status:** Fully Complete & Verified (Backend Migration `0006`, 19/19 Mastery Tests, 82/82 Backend Regression Tests, 20/20 Frontend Mastery Tests, 50/50 Frontend Regression Tests Passed)
 
 ### 1. Objective
 Establish the academic knowledge graph: Concepts, Skills, Learning Evidence collection, Review Schedules, and deterministic Mastery Calculations.
@@ -343,25 +343,30 @@ Phase 5.
 - `POST /api/v1/institutions/{slug}/reviews/{id}/complete`
 
 ### 6. Frontend Changes
-- Pending Phase 6 UI implementation:
-  - Student Knowledge & Mastery Map (Skill progress bars, concept trees).
-  - Evidence Upload & Verification Status tracker.
-  - Spaced Review daily queue.
+- Complete Phase 6 UI deployed at `/workspace/mastery`:
+  - Knowledge Graph & Concepts view with Bloom's taxonomy filters, concept cards, prerequisite linking, and skill competency mappings.
+  - Student Knowledge & Mastery Map with gradient competency indicators (NOVICE, DEVELOPING, PROFICIENT, MASTERY), calculation provenance inspection modal, and confidence metrics.
+  - Learning Evidence collection & faculty verification gate with artifact link validation and instant mastery recalculation.
+  - Daily Spaced Review Queue implementing SuperMemo SM-2 rating controls (0-5) with instant interval advancement.
+- Navigation integration into workspace shell layout.
+- TypeScript interfaces in `frontend/src/types/mastery.ts`.
 
 ### 7. Tests
-- 12 Domain and API tests in `tests/test_mastery_engine.py`:
-  - Unit tests for deterministic mastery blending, Ebbinghaus decay, confidence metrics, and SM-2 progression.
-  - Service tests for Concept/Skill lifecycle, evidence verification, and review flows.
-  - HTTP API integration tests for skills and evidence verification.
-- 75/75 Total backend regression tests passing.
+- Backend:
+  - 19 Unit, service, and HTTP API tests in `tests/test_mastery_engine.py`.
+  - 82/82 Total backend test suite passing.
+- Frontend:
+  - 20 Unit and guardrail tests in `frontend/src/__tests__/mastery.test.ts`.
+  - 50/50 Total frontend test suite passing.
+- Zero TypeScript compiler errors (`tsc --noEmit`).
 
 ### 8. Security Checks
 - Students can only upload evidence to their own profile.
-- Only authorized faculty/HOD can mark evidence as verified.
-- Row-Level Security tenant boundary isolation.
+- Only authorized faculty/HOD/admins can mark evidence as verified.
+- Row-Level Security tenant boundary isolation verified.
 
 ### 9. Acceptance Criteria
-- Verified: Assessments and verified evidence update student skill mastery scores deterministically; SM-2 spaced repetition schedules accurately advance intervals.
+- Verified: Assessments and verified evidence update student skill mastery scores deterministically; SM-2 spaced repetition schedules accurately advance intervals. Backend and Frontend verified end-to-end.
 
 ### 10. Rollback Strategy
 - Alembic downgrade to `0005_assessment_question_bank_grading`.
