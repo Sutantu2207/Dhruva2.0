@@ -375,49 +375,96 @@ Phase 5.
 
 ## Phase 7: Student Projects, Portfolios & Placement Readiness
 
+> **Status:** Fully Complete & Formally Verified (Migration `0007`, 10/10 Domain & API Tests, 92/92 Backend Regression Tests, 12/12 Frontend Placement Tests, 62/62 Frontend Regression Tests, Production Build Passed)
+
 ### 1. Objective
-Enable students to showcase verified capstone projects, construct public/institutional portfolios, and provide Placement Officers with verified talent discovery and career readiness analytics.
+Enable students to author and showcase verified capstone projects, construct public/institutional portfolios with strict privacy controls, compute deterministic explainable career readiness matching, and provide Placement Officers with restricted talent discovery and institutional readiness analytics.
 
 ### 2. Dependencies
 Phase 6.
 
 ### 3. Database Changes
+- Migration: `0007_projects_portfolios_placement.py`
 - Tables:
-  - `projects`, `project_evidences`, `portfolios`, `career_goals`, `career_readiness`
-- Indexes on `(institution_id, readiness_index)`.
+  - `projects`: Student-authored projects with lifecycle states (DRAFT, SUBMITTED, VERIFIED, REJECTED, REVOKED).
+  - `project_skills`: Links projects to demonstrated institutional competencies.
+  - `project_evidences`: Links projects to verified learning evidence items.
+  - `portfolios`: Student portfolio settings, slugs, headline, bio, visibility controls (PRIVATE, INSTITUTION, PUBLIC), curated project IDs, and social links.
+  - `career_goals`: Student target career objectives, target industry, target companies, and required competencies.
+  - `career_readiness`: Deterministic readiness index, gap analysis, met/partial/deficit counts, calculation provenance, and rule version.
+- Indexes:
+  - `(institution_id, status)` on `projects`.
+  - `(student_user_id, institution_id)` on `projects`, `career_goals`, `career_readiness`.
+  - `(institution_id, readiness_score)` on `career_readiness`.
+  - `(institution_id, visibility, is_published)` on `portfolios`.
+- Row-Level Security enabled on all 6 tables with PostgreSQL tenant isolation policies.
 
 ### 4. Backend Changes
-- Project verification workflow (Faculty approval of project deliverables).
-- Portfolio publication engine with custom slugs.
-- Career Readiness Index calculation matching student verified skills against job profile requirements.
+- Deterministic Career Readiness Engine (`DeterministicReadinessEngine`):
+  - Rule version: `2026.1`.
+  - Arithmetic mean of verified competencies against required role skills.
+  - Explicitly distinguishes missing evidence (`MISSING_EVIDENCE`, score 0.0) from assessed zero.
+  - Applies Ebbinghaus exponential decay to mastery scores before threshold matching.
+  - Returns itemized gap analysis with actionable recommendations.
+- Student Project Studio Service:
+  - Project creation, updating (permitted only in DRAFT/REJECTED), submission, and skill/evidence linkage.
+  - Faculty review gate (approval, rejection, revocation with mandatory justification).
+- Portfolio Builder Service:
+  - Publication gating and privacy enforcement (PRIVATE, INSTITUTION, PUBLIC).
+  - Public output strictly filters out unverified or draft projects.
+- Placement Officer Talent Discovery Service:
+  - Restricted to Placement Officers and Admins.
+  - Multi-attribute search (min readiness score, target role, required skills).
+  - Institutional analytics (average score, high/proficient/developing/deficit distribution, top target roles).
 
 ### 5. API Changes
 - `GET/POST /api/v1/institutions/{slug}/projects`
+- `GET /api/v1/institutions/{slug}/projects/{id}`
+- `PUT /api/v1/institutions/{slug}/projects/{id}`
+- `POST /api/v1/institutions/{slug}/projects/{id}/submit`
+- `POST /api/v1/institutions/{slug}/projects/{id}/link-skill`
+- `POST /api/v1/institutions/{slug}/projects/{id}/link-evidence`
 - `POST /api/v1/institutions/{slug}/projects/{id}/verify`
+- `POST /api/v1/institutions/{slug}/projects/{id}/revoke`
 - `GET/PUT /api/v1/institutions/{slug}/portfolios/me`
+- `POST /api/v1/institutions/{slug}/portfolios/me/publish`
+- `GET /api/v1/institutions/{slug}/portfolios/{slug}`
+- `GET/POST /api/v1/institutions/{slug}/career-goals/me`
+- `POST /api/v1/institutions/{slug}/career-readiness/calculate`
 - `GET /api/v1/institutions/{slug}/placement/talent-pool`
 - `GET /api/v1/institutions/{slug}/placement/readiness-analytics`
 
 ### 6. Frontend Changes
-- Student Project Studio and Public Portfolio Builder.
-- Placement Officer Workspace:
-  - Candidate Discovery by Skill & Verification filters.
-  - Career Readiness Index Distribution charts.
-  - Student Portfolio Inspector.
+- Complete Phase 7 UI deployed at `/workspace/placement`:
+  - Project Studio tab: Project deliverable creation, edit guards, faculty verification and revocation modals.
+  - Portfolio Builder tab: Headline, bio, visibility controls (PRIVATE, INSTITUTION, PUBLIC), curated project selection, publish switch, and live preview.
+  - Career Goals & Readiness tab: Target role configuration, active goal banner, large readiness indicator, recalculation trigger, and itemized gap analysis breakdown.
+  - Placement Talent Discovery tab: Restricted to Placement Officers and staff with readiness filter, role search, candidate cards, and institutional analytics summary.
+- Navigation integration into workspace shell layout.
+- TypeScript interfaces in `frontend/src/types/placement.ts`.
 
 ### 7. Tests
-- Project submission and verification tests.
-- Readiness calculation precision tests.
+- Backend:
+  - 10 Unit, service, and HTTP API integration tests in `tests/test_placement_portfolio.py`.
+  - 92/92 Total backend test suite passing.
+- Frontend:
+  - 12 Unit and guardrail tests in `frontend/src/__tests__/placement.test.ts`.
+  - 62/62 Total frontend test suite passing.
+- Zero TypeScript compiler errors (`tsc --noEmit`).
+- Production build succeeded (`next build`, all 12 routes statically optimized).
 
 ### 8. Security Checks
-- Portfolio privacy settings enforcement (Private vs. Institution vs. Public).
-- Placement officer data access restricted strictly to their assigned institution.
+- Cross-student project modifications strictly denied (403).
+- Only authorized faculty/HOD/admins can verify or revoke projects.
+- Portfolio privacy enforced: PRIVATE portfolios blocked for external viewers; unverified projects hidden from public views.
+- Placement Talent Pool restricted to `PLACEMENT_OFFICER`, `SUPER_ADMIN`, `INSTITUTION_ADMIN`, `HOD`. Students are denied (403).
+- Database Row-Level Security tenant boundary isolation.
 
 ### 9. Acceptance Criteria
-- Student can showcase verified projects in an accessible portfolio; Placement Officer can filter talent pool by verified skills.
+- Verified: Student can author and submit projects, faculty can approve/revoke with recorded notes, students can curate and publish portfolios with privacy gating, deterministic readiness computes gap analysis, and placement officers can search verified talent within institutional scope.
 
 ### 10. Rollback Strategy
-- Database rollback for portfolio and project tables.
+- Alembic downgrade to `0006_mastery_skills_evidence_review`.
 
 ---
 

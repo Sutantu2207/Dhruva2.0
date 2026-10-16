@@ -8,6 +8,7 @@ from src.interfaces.http.api.v1.curriculum import router as curriculum_router
 from src.interfaces.http.api.v1.ingestion import router as ingestion_router
 from src.interfaces.http.api.v1.institutions import router as institutions_router
 from src.interfaces.http.api.v1.mastery import router as mastery_router
+from src.interfaces.http.api.v1.placement import router as placement_router
 from src.interfaces.http.api.v1.platform import router as platform_router
 
 
@@ -20,5 +21,6 @@ api_v1_router.include_router(curriculum_router)
 api_v1_router.include_router(ingestion_router)
 api_v1_router.include_router(assessment_router)
 api_v1_router.include_router(mastery_router)
+api_v1_router.include_router(placement_router)
 
 

@@ -45,6 +45,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
     { href: '/workspace/datacenter', label: 'Data Center & Ingestion' },
     { href: '/workspace/assessments', label: 'Assessments & Grading' },
     { href: '/workspace/mastery', label: 'Mastery & Evidence' },
+    { href: '/workspace/placement', label: 'Projects & Placement' },
   ];
 
   return (
