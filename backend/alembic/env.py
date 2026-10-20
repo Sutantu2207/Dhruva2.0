@@ -17,6 +17,7 @@ import src.domain.assessment.models  # registers QuestionBank, Question, Assessm
 import src.domain.mastery.models     # registers Concept, Skill, ConceptSkill, MasteryRecord, LearningEvidence, ReviewSchedule
 import src.domain.placement.models   # registers Project, ProjectSkill, ProjectEvidence, Portfolio, CareerGoal, CareerReadiness
 import src.domain.analytics.models   # registers Intervention, Notification, AnalyticsRollup
+import src.domain.ai.models          # registers AIConversation, AIMessage, AIAuditLog
 
 config = context.config
 settings = get_settings()

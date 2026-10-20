@@ -31,6 +31,7 @@ import src.domain.assessment.models
 import src.domain.mastery.models
 import src.domain.placement.models
 import src.domain.analytics.models
+import src.domain.ai.models
 from src.infrastructure.persistence.postgres.base import Base
 from src.infrastructure.persistence.postgres.database import get_db_session
 from src.main import app

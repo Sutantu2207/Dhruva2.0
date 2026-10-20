@@ -45,7 +45,6 @@ describe('Deterministic Career Readiness Calculations', () => {
 
     for (const item of skills) {
       if (item.score === null) {
-        breakdown.append ? null : null;
         breakdown.push({
           code: item.code,
           status: 'MISSING_EVIDENCE',

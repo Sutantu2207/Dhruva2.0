@@ -101,6 +101,7 @@ def setup_logging(service_name: str = "dhruva-backend", debug: bool = False) -> 
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.error").setLevel(logging.INFO)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+    logging.getLogger("aiosqlite").setLevel(logging.WARNING)
 
     return root_logger
 
