@@ -16,6 +16,7 @@ import src.domain.ingestion.models   # registers DataSource, ImportBatch, Staged
 import src.domain.assessment.models  # registers QuestionBank, Question, Assessment, AssessmentQuestion, AssessmentSubmission, AssessmentResult
 import src.domain.mastery.models     # registers Concept, Skill, ConceptSkill, MasteryRecord, LearningEvidence, ReviewSchedule
 import src.domain.placement.models   # registers Project, ProjectSkill, ProjectEvidence, Portfolio, CareerGoal, CareerReadiness
+import src.domain.analytics.models   # registers Intervention, Notification, AnalyticsRollup
 
 config = context.config
 settings = get_settings()

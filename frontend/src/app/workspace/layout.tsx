@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 export default function WorkspaceLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -46,6 +47,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
     { href: '/workspace/assessments', label: 'Assessments & Grading' },
     { href: '/workspace/mastery', label: 'Mastery & Evidence' },
     { href: '/workspace/placement', label: 'Projects & Placement' },
+    { href: '/workspace/analytics', label: 'Analytics & Interventions' },
   ];
 
   return (
@@ -193,7 +195,8 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
             </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <NotificationBell institutionId={user.institution_id} />
             <Badge variant="success">Engine: Active</Badge>
           </div>
         </header>
