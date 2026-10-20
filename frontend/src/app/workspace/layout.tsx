@@ -53,8 +53,14 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
+      {/* Skip to Main Content Link for Screen Readers & Keyboard Users (WCAG 2.4.1) */}
+      <a href="#main-content" className="skip-link">
+        Skip to main content
+      </a>
+
       {/* Sidebar Navigation */}
       <aside
+        aria-label="Workspace Sidebar"
         style={{
           width: '240px',
           borderRight: '1px solid var(--border-subtle)',
@@ -102,7 +108,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* Navigation Links */}
-          <nav style={{ padding: '16px 8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <nav aria-label="Primary Workspace Navigation" style={{ padding: '16px 8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {navItems.map((item) => {
               const isActive = pathname === item.href;
               return (
@@ -202,8 +208,12 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
           </div>
         </header>
 
-        {/* Page Content Body */}
-        <main style={{ flex: 1, padding: '24px', maxWidth: '1200px', width: '100%', margin: '0 auto' }}>
+        {/* Page Content Body (WCAG AA 1.3.1 Landmark) */}
+        <main
+          id="main-content"
+          tabIndex={-1}
+          style={{ flex: 1, padding: '24px', maxWidth: '1200px', width: '100%', margin: '0 auto', outline: 'none' }}
+        >
           {children}
         </main>
       </div>

@@ -1,0 +1,30 @@
+# Version control & IDE
+.git
+.gitignore
+.idea
+.vscode
+
+# Python byte-code and caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local configuration & secrets
+.env
+.env.*
+!.env.example
+
+# Local SQLite databases
+*.db
+*.sqlite3
+*.sqlite
+dhruva_dev.db
+
+# Testing and development directories
+tests/
+scratch/
+docs/

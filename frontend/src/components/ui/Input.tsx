@@ -27,6 +27,14 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <input
           id={inputId}
           ref={ref}
+          aria-invalid={Boolean(error)}
+          aria-describedby={
+            error && inputId
+              ? `${inputId}-error`
+              : helperText && inputId
+              ? `${inputId}-helper`
+              : undefined
+          }
           style={{
             width: '100%',
             padding: '9px 12px',
@@ -41,12 +49,20 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           {...props}
         />
         {error && (
-          <span style={{ fontSize: '12px', color: 'var(--status-danger)', fontWeight: 400 }}>
+          <span
+            id={inputId ? `${inputId}-error` : undefined}
+            role="alert"
+            aria-live="polite"
+            style={{ fontSize: '12px', color: 'var(--status-danger)', fontWeight: 500 }}
+          >
             {error}
           </span>
         )}
         {helperText && !error && (
-          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+          <span
+            id={inputId ? `${inputId}-helper` : undefined}
+            style={{ fontSize: '12px', color: 'var(--text-muted)' }}
+          >
             {helperText}
           </span>
         )}

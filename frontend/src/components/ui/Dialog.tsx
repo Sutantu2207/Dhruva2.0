@@ -36,6 +36,8 @@ export const Dialog: React.FC<DialogProps> = ({
     <div
       role="dialog"
       aria-modal="true"
+      aria-labelledby="dialog-title"
+      aria-describedby={description ? 'dialog-description' : undefined}
       style={{
         position: 'fixed',
         inset: 0,
@@ -67,11 +69,11 @@ export const Dialog: React.FC<DialogProps> = ({
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
+            <h2 id="dialog-title" style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
               {title}
             </h2>
             {description && (
-              <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
+              <p id="dialog-description" style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
                 {description}
               </p>
             )}

@@ -64,6 +64,8 @@ export const Button: React.FC<ButtonProps> = ({
   return (
     <button
       disabled={disabled || isLoading}
+      aria-busy={isLoading}
+      aria-disabled={disabled || isLoading}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -82,17 +84,21 @@ export const Button: React.FC<ButtonProps> = ({
       {...props}
     >
       {isLoading && (
-        <span
-          style={{
-            display: 'inline-block',
-            width: '14px',
-            height: '14px',
-            border: '2px solid rgba(255,255,255,0.3)',
-            borderRadius: '50%',
-            borderTopColor: '#ffffff',
-            animation: 'spin 0.6s linear infinite',
-          }}
-        />
+        <>
+          <span
+            aria-hidden="true"
+            style={{
+              display: 'inline-block',
+              width: '14px',
+              height: '14px',
+              border: '2px solid rgba(255,255,255,0.3)',
+              borderRadius: '50%',
+              borderTopColor: '#ffffff',
+              animation: 'spin 0.6s linear infinite',
+            }}
+          />
+          <span className="sr-only">Loading...</span>
+        </>
       )}
       {children}
     </button>

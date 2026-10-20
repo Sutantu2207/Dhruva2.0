@@ -112,8 +112,56 @@ button, input, select, textarea {
 }
 
 :focus-visible {
-  outline: none;
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
   box-shadow: var(--focus-ring);
+}
+
+/* Screen reader only utility (WCAG AA 4.1.2) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Skip to main content navigation link (WCAG AA 2.4.1) */
+.skip-link {
+  position: absolute;
+  top: -60px;
+  left: 16px;
+  background-color: var(--brand-primary);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 13px;
+  z-index: 1000;
+  text-decoration: none;
+  transition: top 0.15s ease;
+  box-shadow: var(--shadow-md);
+}
+
+.skip-link:focus {
+  top: 16px;
+  outline: 2px solid var(--border-focus);
+}
+
+/* Respect user preference for reduced motion (WCAG AA 2.3.3) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Scrollbar refinement */

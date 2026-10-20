@@ -42,6 +42,7 @@ export function Table<T>({
             {columns.map((col) => (
               <th
                 key={col.key}
+                scope="col"
                 style={{
                   padding: '12px 16px',
                   fontWeight: 600,
