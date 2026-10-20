@@ -23,6 +23,7 @@ def upgrade() -> None:
 
     if is_postgres:
         op.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
+        op.execute('CREATE EXTENSION IF NOT EXISTS vector;')
 
     # 1. Institutions
     op.create_table(

@@ -16,6 +16,7 @@ services:
     plan: standard
     region: oregon
     healthCheckPath: /health/live
+    preDeployCommand: alembic upgrade head
     autoDeploy: true
     envVars:
       - key: ENVIRONMENT

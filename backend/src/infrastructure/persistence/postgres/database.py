@@ -22,6 +22,11 @@ settings = get_settings()
 
 def build_engine(database_url: str) -> AsyncEngine:
     """Build SQLAlchemy async engine configured for target database dialect."""
+    if database_url.startswith("postgres://"):
+        database_url = database_url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif database_url.startswith("postgresql://") and not database_url.startswith("postgresql+"):
+        database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
     if database_url.startswith("sqlite"):
         # SQLite async configuration
         connect_args = {"check_same_thread": False}

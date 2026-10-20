@@ -63,6 +63,24 @@ class TestProductionConfigValidation:
         assert valid_settings.DEBUG is False
         assert valid_settings.COOKIE_SECURE is True
 
+    def test_render_postgres_url_automatically_normalized(self):
+        # Render and Heroku inject postgres:// or postgresql:// without asyncpg driver
+        s1 = Settings(
+            ENVIRONMENT=EnvironmentType.PRODUCTION,
+            SECRET_KEY="prod_super_secure_cryptographic_random_token_minimum_32_bytes_ok",
+            DATABASE_URL="postgres://user:pass@ep-host.oregon.render.com:5432/dhruva_db",
+            DEBUG=False,
+        )
+        assert s1.DATABASE_URL.startswith("postgresql+asyncpg://")
+
+        s2 = Settings(
+            ENVIRONMENT=EnvironmentType.PRODUCTION,
+            SECRET_KEY="prod_super_secure_cryptographic_random_token_minimum_32_bytes_ok",
+            DATABASE_URL="postgresql://user:pass@ep-host.oregon.render.com:5432/dhruva_db",
+            DEBUG=False,
+        )
+        assert s2.DATABASE_URL.startswith("postgresql+asyncpg://")
+
 
 @pytest.mark.asyncio
 class TestSecurityHeadersMiddleware:
