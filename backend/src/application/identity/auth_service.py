@@ -111,35 +111,8 @@ class AuthService:
         # Update last login timestamp
         await self.repository.update_last_login(user.id)
 
-        # Collect user roles & permissions
-        role_codes = [ur.role.code for ur in user.user_roles if ur.role]
-        permissions = await self.repository.get_user_permissions(user.id)
-
-        # Generate JWT Access Token
-        claims: Dict[str, Any] = {
-            "email": user.email,
-            "institution_id": str(user.institution_id) if user.institution_id else None,
-            "roles": role_codes,
-            "permissions": list(permissions),
-        }
-        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = create_access_token(
-            subject=str(user.id),
-            claims=claims,
-            expires_delta=access_token_expires,
-        )
-
-        # Generate and persist rotating Refresh Token
-        refresh_token_plain = generate_refresh_token()
-        refresh_hash = hash_token(refresh_token_plain)
-        refresh_expires = utc_now() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-
-        await self.repository.save_refresh_token(
-            user_id=user.id,
-            institution_id=user.institution_id,
-            token_hash=refresh_hash,
-            expires_at=refresh_expires,
-        )
+        # Issue session tokens
+        access_token, refresh_token_plain, expires_in = await self.issue_tokens(user)
 
         # Log successful login in audit trail
         await self.audit_service.log_event(
@@ -153,7 +126,38 @@ class AuthService:
             request_id=request_id,
         )
 
-        return user, access_token, refresh_token_plain, int(access_token_expires.total_seconds())
+        return user, access_token, refresh_token_plain, expires_in
+
+    async def issue_tokens(self, user: User) -> Tuple[str, str, int]:
+        """Generate access and rotating refresh tokens for an authenticated user."""
+        role_codes = [ur.role.code for ur in user.user_roles if ur.role]
+        permissions = await self.repository.get_user_permissions(user.id)
+
+        claims: Dict[str, Any] = {
+            "email": user.email,
+            "institution_id": str(user.institution_id) if user.institution_id else None,
+            "roles": role_codes,
+            "permissions": list(permissions),
+        }
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            subject=str(user.id),
+            claims=claims,
+            expires_delta=access_token_expires,
+        )
+
+        refresh_token_plain = generate_refresh_token()
+        refresh_hash = hash_token(refresh_token_plain)
+        refresh_expires = utc_now() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+        await self.repository.save_refresh_token(
+            user_id=user.id,
+            institution_id=user.institution_id,
+            token_hash=refresh_hash,
+            expires_at=refresh_expires,
+        )
+
+        return access_token, refresh_token_plain, int(access_token_expires.total_seconds())
 
     async def refresh_session(
         self,
@@ -273,23 +277,24 @@ class AuthService:
         )
 
         # Assign role
-        await self.repository.assign_role(
-            user_id=created_user.id,
+        user_id = created_user.id
+        user_role = await self.repository.assign_role(
+            user_id=user_id,
             role_id=role.id,
             institution_id=institution_id,
             granted_by=actor_user_id,
         )
+        user_role.role = role
+        created_user.user_roles = [user_role]
 
         await self.audit_service.log_event(
             action="USER_CREATED",
             entity_name="User",
-            entity_id=created_user.id,
+            entity_id=user_id,
             institution_id=institution_id,
-            actor_user_id=actor_user_id or created_user.id,
+            actor_user_id=actor_user_id or user_id,
             new_values={"email": created_user.email, "role": role_type.value},
             request_id=request_id,
         )
 
-        # Reload with relationships
-        loaded_user = await self.repository.get_by_id(created_user.id)
-        return loaded_user or created_user
+        return created_user

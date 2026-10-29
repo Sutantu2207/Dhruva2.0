@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth/AuthContext';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
 import {
   Sparkles,
   ShieldCheck,
@@ -16,33 +15,212 @@ import {
   PlusCircle,
   CheckCircle2,
   Lock,
-  Search,
-  Eye,
   RefreshCw,
-  HelpCircle,
   Cpu,
+  Copy,
+  Check,
+  Trash2,
+  Plus,
+  MessageSquare,
+  RotateCcw,
+  Code as CodeIcon,
+  ChevronRight,
+  ExternalLink,
 } from 'lucide-react';
+import { api, ApiError } from '@/lib/api/client';
+import { Course } from '@/types/academic';
 import {
   CitationItem,
   TutorChatMessage,
   DraftQuestionItem,
   AIAuditLog,
+  AIConversation,
+  AIProviderStatus,
+  AIMessageItem,
 } from '@/types/ai';
 import {
   detectAndSanitizePII,
   checkPromptSecurity,
-  transformDraftToQuestionAdmin,
-  formatCitationBadge,
 } from '@/lib/ai/guardrails';
 
-const DEMO_COURSES = [
-  { id: 'c-cs201', code: 'CS201', name: 'Data Structures & Algorithms', department: 'Computer Science' },
-  { id: 'c-cs301', code: 'CS301', name: 'Database Management Systems', department: 'Computer Science' },
-  { id: 'c-ec202', code: 'EC202', name: 'Digital Signal Processing', department: 'Electronics' },
-];
+/**
+ * Lightweight, safe Markdown & Code Renderer for AI tutor responses
+ */
+function FormattedMessage({ content }: { content: string }) {
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  const handleCopyCode = (code: string, index: number) => {
+    navigator.clipboard.writeText(code);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const blocks = useMemo(() => {
+    const rawBlocks = content.split(/(```[\s\S]*?```)/g);
+    return rawBlocks.map((block, idx) => {
+      if (block.startsWith('```') && block.endsWith('```')) {
+        const firstLineEnd = block.indexOf('\n');
+        const lang = firstLineEnd > 3 ? block.slice(3, firstLineEnd).trim() : 'code';
+        const code = firstLineEnd > 3 ? block.slice(firstLineEnd + 1, -3) : block.slice(3, -3);
+        return { type: 'code' as const, lang, code: code.trim(), key: idx };
+      }
+      return { type: 'text' as const, text: block, key: idx };
+    });
+  }, [content]);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '14px', lineHeight: 1.6 }}>
+      {blocks.map((block) => {
+        if (block.type === 'code') {
+          return (
+            <div
+              key={block.key}
+              style={{
+                borderRadius: '8px',
+                overflow: 'hidden',
+                border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))',
+                backgroundColor: '#0d1117',
+                color: '#e6edf3',
+                margin: '6px 0',
+              }}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '6px 12px',
+                  backgroundColor: '#161b22',
+                  borderBottom: '1px solid rgba(255,255,255,0.08)',
+                  fontSize: '11px',
+                  fontWeight: 600,
+                  color: '#8b949e',
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CodeIcon size={12} />
+                  {block.lang.toUpperCase()}
+                </span>
+                <button
+                  onClick={() => handleCopyCode(block.code, block.key)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#8b949e',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '11px',
+                  }}
+                  title="Copy code to clipboard"
+                >
+                  {copiedIndex === block.key ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+                  <span>{copiedIndex === block.key ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+              <pre
+                style={{
+                  padding: '12px 14px',
+                  margin: 0,
+                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                  fontSize: '13px',
+                  overflowX: 'auto',
+                  lineHeight: 1.5,
+                }}
+              >
+                <code>{block.code}</code>
+              </pre>
+            </div>
+          );
+        }
+
+        // Parse paragraphs, bolding, bullet points
+        const lines = block.text.split('\n');
+        return (
+          <div key={block.key} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {lines.map((line, lIdx) => {
+              const trimmed = line.trim();
+              if (!trimmed) {
+                return <div key={lIdx} style={{ height: '4px' }} />;
+              }
+
+              // Bold inline parser
+              const renderFormattedText = (txt: string) => {
+                const parts = txt.split(/(\*\*.*?\*\*|`.*?`)/g);
+                return parts.map((part, pIdx) => {
+                  if (part.startsWith('**') && part.endsWith('**')) {
+                    return <strong key={pIdx} style={{ color: 'inherit' }}>{part.slice(2, -2)}</strong>;
+                  }
+                  if (part.startsWith('`') && part.endsWith('`')) {
+                    return (
+                      <code
+                        key={pIdx}
+                        style={{
+                          padding: '2px 5px',
+                          borderRadius: '4px',
+                          backgroundColor: 'rgba(125, 125, 125, 0.15)',
+                          fontFamily: 'monospace',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {part.slice(1, -1)}
+                      </code>
+                    );
+                  }
+                  return part;
+                });
+              };
+
+              // Headings
+              if (trimmed.startsWith('### ')) {
+                return (
+                  <h4 key={lIdx} style={{ fontSize: '15px', fontWeight: 700, margin: '6px 0 2px 0' }}>
+                    {renderFormattedText(trimmed.slice(4))}
+                  </h4>
+                );
+              }
+              if (trimmed.startsWith('## ')) {
+                return (
+                  <h3 key={lIdx} style={{ fontSize: '16px', fontWeight: 700, margin: '8px 0 2px 0' }}>
+                    {renderFormattedText(trimmed.slice(3))}
+                  </h3>
+                );
+              }
+
+              // Bullet points
+              if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+                return (
+                  <div key={lIdx} style={{ display: 'flex', gap: '8px', paddingLeft: '8px' }}>
+                    <span style={{ color: '#3b82f6' }}>•</span>
+                    <span>{renderFormattedText(trimmed.slice(2))}</span>
+                  </div>
+                );
+              }
+
+              // Numbered list
+              const numMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
+              if (numMatch) {
+                return (
+                  <div key={lIdx} style={{ display: 'flex', gap: '8px', paddingLeft: '8px' }}>
+                    <span style={{ fontWeight: 600, minWidth: '16px' }}>{numMatch[1]}.</span>
+                    <span>{renderFormattedText(numMatch[2])}</span>
+                  </div>
+                );
+              }
+
+              return <p key={lIdx} style={{ margin: 0 }}>{renderFormattedText(line)}</p>;
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function AIGatewayWorkspace() {
   const { user } = useAuth();
+  const tenantSlug = user?.institution_slug || '';
   const primaryRole = user?.roles[0] || 'STUDENT';
   const isStaff = ['SUPER_ADMIN', 'INSTITUTION_ADMIN', 'HOD', 'FACULTY'].includes(primaryRole);
   const isAdmin = ['SUPER_ADMIN', 'INSTITUTION_ADMIN', 'HOD'].includes(primaryRole);
@@ -50,12 +228,185 @@ export default function AIGatewayWorkspace() {
   // Active Tab: 'tutor' | 'drafting' | 'audit'
   const [activeTab, setActiveTab] = useState<'tutor' | 'drafting' | 'audit'>('tutor');
 
-  // Selected Course
-  const [selectedCourseId, setSelectedCourseId] = useState<string>(DEMO_COURSES[0].id);
-  const currentCourse = useMemo(
-    () => DEMO_COURSES.find((c) => c.id === selectedCourseId) || DEMO_COURSES[0],
-    [selectedCourseId]
-  );
+  // Real Courses from Database
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>('');
+  const [isCoursesLoading, setIsCoursesLoading] = useState<boolean>(true);
+
+  // AI Provider Status
+  const [providerStatus, setProviderStatus] = useState<AIProviderStatus | null>(null);
+  const [isProviderStatusLoading, setIsProviderStatusLoading] = useState<boolean>(false);
+
+  // Conversation Sidebar State
+  const [conversations, setConversations] = useState<AIConversation[]>([]);
+  const [isConversationsLoading, setIsConversationsLoading] = useState<boolean>(false);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+
+  // Chat Scroll Anchor
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  // Initial Welcome Message
+  const defaultWelcomeMessage: TutorChatMessage = {
+    id: 'msg-init-1',
+    role: 'assistant',
+    content: `Hello! I am your Dhruva.AI Conversational Academic Intelligence Assistant.\n\nI answer your exact questions using authorized course syllabi, lecture modules, and verified pedagogical context. I also support multi-turn dialogue, Python code explanations, and structured exam preparations.\n\nHow can I help you excel today?`,
+    citations: [],
+    model_name: 'dhruva-guardrailed-gateway-v2',
+    pii_detected_count: 0,
+    latency_ms: 12,
+    is_refusal: false,
+    created_at: new Date().toISOString(),
+  };
+
+  const [messages, setMessages] = useState<TutorChatMessage[]>([defaultWelcomeMessage]);
+
+  // Load Courses
+  useEffect(() => {
+    if (!tenantSlug) return;
+    const fetchCourses = async () => {
+      setIsCoursesLoading(true);
+      try {
+        const fetchedCourses = await api.get<Course[]>(`/institutions/${tenantSlug}/courses`);
+        if (fetchedCourses && fetchedCourses.length > 0) {
+          setCourses(fetchedCourses);
+          setSelectedCourseId(fetchedCourses[0].id);
+        } else {
+          setCourses([]);
+        }
+      } catch {
+        setCourses([]);
+      } finally {
+        setIsCoursesLoading(false);
+      }
+    };
+    fetchCourses();
+  }, [tenantSlug]);
+
+  // Load Provider Status
+  const fetchProviderStatus = async () => {
+    if (!tenantSlug) return;
+    setIsProviderStatusLoading(true);
+    try {
+      const status = await api.get<AIProviderStatus>(`/institutions/${tenantSlug}/ai/provider-status`);
+      setProviderStatus(status);
+    } catch {
+      setProviderStatus(null);
+    } finally {
+      setIsProviderStatusLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProviderStatus();
+  }, [tenantSlug]);
+
+  // Load User's Past Conversations
+  const fetchConversations = async () => {
+    if (!tenantSlug) return;
+    setIsConversationsLoading(true);
+    try {
+      const convos = await api.get<AIConversation[]>(`/institutions/${tenantSlug}/ai/conversations`);
+      setConversations(convos || []);
+    } catch {
+      setConversations([]);
+    } finally {
+      setIsConversationsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchConversations();
+  }, [tenantSlug]);
+
+  // Scroll to bottom on new message
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const currentCourse = useMemo(() => {
+    if (courses.length > 0) {
+      return courses.find((c) => c.id === selectedCourseId) || courses[0];
+    }
+    return {
+      id: selectedCourseId || 'default-course',
+      code: 'COURSE',
+      title: 'Institutional Syllabus',
+      name: 'Institutional Syllabus',
+      department_id: '',
+      credits: 3.0,
+      course_type: 'THEORY',
+      status: 'ACTIVE',
+      institution_id: user?.institution_id || '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    } as Course;
+  }, [courses, selectedCourseId, user?.institution_id]);
+
+  // Switch or Resume Conversation
+  const handleSelectConversation = async (convoId: string) => {
+    if (convoId === activeConversationId) return;
+    setActiveConversationId(convoId);
+
+    try {
+      const history = await api.get<AIMessageItem[]>(
+        `/institutions/${tenantSlug}/ai/conversations/${convoId}/messages`
+      );
+      if (history && history.length > 0) {
+        const mappedMessages: TutorChatMessage[] = history.map((m) => ({
+          id: m.id,
+          conversation_id: m.conversation_id,
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+          model_name: m.model_name || 'dhruva-guardrailed-gateway-v2',
+          pii_detected_count: m.pii_detected_count || 0,
+          latency_ms: m.latency_ms || undefined,
+          is_refusal: false,
+          created_at: m.created_at,
+        }));
+        setMessages(mappedMessages);
+      } else {
+        setMessages([defaultWelcomeMessage]);
+      }
+    } catch {
+      // If error loading history, retain current view
+    }
+  };
+
+  // Start New Conversation
+  const handleNewConversation = () => {
+    setActiveConversationId(null);
+    setMessages([
+      {
+        ...defaultWelcomeMessage,
+        id: `msg-new-${Date.now()}`,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+  };
+
+  // Delete Conversation
+  const handleDeleteConversation = async (e: React.MouseEvent, convoId: string) => {
+    e.stopPropagation();
+    try {
+      await api.delete(`/institutions/${tenantSlug}/ai/conversations/${convoId}`);
+      setConversations((prev) => prev.filter((c) => c.id !== convoId));
+      if (activeConversationId === convoId) {
+        handleNewConversation();
+      }
+    } catch {
+      // Ignored
+    }
+  };
+
+  // Copy Message Content
+  const handleCopyMessage = (msgId: string, content: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedMessageId(msgId);
+    setTimeout(() => setCopiedMessageId(null), 2000);
+  };
 
   // -------------------------------------------------------------
   // TAB 1: TUTOR CHAT STATE
@@ -63,29 +414,6 @@ export default function AIGatewayWorkspace() {
   const [chatInput, setChatInput] = useState<string>('');
   const [isSubmittingChat, setIsSubmittingChat] = useState<boolean>(false);
   const [selectedCitationModal, setSelectedCitationModal] = useState<CitationItem | null>(null);
-
-  const [messages, setMessages] = useState<TutorChatMessage[]>([
-    {
-      id: 'msg-init-1',
-      role: 'assistant',
-      content: `Hello! I am your Dhruva.AI Grounded Study Assistant for **${currentCourse.code}: ${currentCourse.name}**. Every answer I provide is cross-referenced with your department's approved syllabus, lecture materials, and textbook references with verifiable provenance. How can I assist your learning today?`,
-      citations: [
-        {
-          citation_id: 'CIT-01',
-          source_type: 'SYLLABUS_MODULE',
-          entity_id: 'mod-trees-01',
-          title: 'Module 3: Balanced Search Trees & AVL Invariants',
-          course_code: currentCourse.code,
-          provenance: 'Approved Syllabus 2026 / Academic Council Ref AC-2026-CS201-P3',
-        },
-      ],
-      model_name: 'dhruva-guardrailed-gateway-v2',
-      pii_detected_count: 0,
-      latency_ms: 124,
-      is_refusal: false,
-      created_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
-    },
-  ]);
 
   // Real-time pre-flight client PII check
   const piiPreview = useMemo(() => {
@@ -99,10 +427,11 @@ export default function AIGatewayWorkspace() {
     return checkPromptSecurity(chatInput);
   }, [chatInput]);
 
-  const handleSendChat = () => {
-    if (!chatInput.trim() || isSubmittingChat) return;
+  const handleSendChat = async (messageToSend?: string) => {
+    const rawText = messageToSend || chatInput;
+    if (!rawText.trim() || isSubmittingChat) return;
 
-    const securityCheck = checkPromptSecurity(chatInput);
+    const securityCheck = checkPromptSecurity(rawText);
     if (!securityCheck.isSafe) {
       const refusalMsg: TutorChatMessage = {
         id: `msg-refusal-${Date.now()}`,
@@ -117,7 +446,7 @@ export default function AIGatewayWorkspace() {
         {
           id: `msg-user-${Date.now()}`,
           role: 'user',
-          content: chatInput,
+          content: rawText,
           created_at: new Date().toISOString(),
         },
         refusalMsg,
@@ -126,7 +455,7 @@ export default function AIGatewayWorkspace() {
       return;
     }
 
-    const pii = detectAndSanitizePII(chatInput);
+    const pii = detectAndSanitizePII(rawText);
     const userMsg: TutorChatMessage = {
       id: `msg-user-${Date.now()}`,
       role: 'user',
@@ -139,223 +468,247 @@ export default function AIGatewayWorkspace() {
     setChatInput('');
     setIsSubmittingChat(true);
 
-    // Simulate grounded retrieval response with citations
-    setTimeout(() => {
+    try {
+      const response = await api.post<{
+        conversation_id: string;
+        message_id: string;
+        course_id: string;
+        course_code: string;
+        role: string;
+        content: string;
+        citations: CitationItem[];
+        model_name: string;
+        pii_detected_count: number;
+        latency_ms: number;
+        is_refusal: boolean;
+        created_at: string;
+      }>(`/institutions/${tenantSlug}/ai/tutor/chat`, {
+        course_id: currentCourse.id,
+        message: pii.sanitizedText,
+        conversation_id: activeConversationId || undefined,
+      });
+
+      if (response.conversation_id) {
+        if (!activeConversationId) {
+          setActiveConversationId(response.conversation_id);
+          fetchConversations();
+        }
+      }
+
       const botResponse: TutorChatMessage = {
-        id: `msg-bot-${Date.now()}`,
+        id: response.message_id || `msg-bot-${Date.now()}`,
         role: 'assistant',
-        content: `In an AVL Tree, self-balancing is achieved through rotational invariants. Specifically, for every node $u$, the balance factor is defined as $\\text{height}(u.\\text{left}) - \\text{height}(u.\\text{right}) \\in \\{-1, 0, 1\\}$. Whenever an insertion causes this factor to become $\\pm 2$, a single or double rotation restores log-time search, insert, and delete guarantees.`,
-        citations: [
-          {
-            citation_id: 'CIT-02',
-            source_type: 'COURSE_NOTE',
-            entity_id: 'lec-avl-rotations',
-            title: 'Lecture 12: AVL Trees & Rotational Balance Restorations',
-            course_code: currentCourse.code,
-            provenance: 'Approved Handout: Prof. Sharma / Dept. of CSE / Page 4',
-          },
-          {
-            citation_id: 'CIT-03',
-            source_type: 'TEXTBOOK_CHAPTER',
-            entity_id: 'tb-clrs-ch13',
-            title: 'CLRS Chapter 13: Red-Black & Height-Balanced Search Trees',
-            course_code: currentCourse.code,
-            provenance: 'Prescribed Text / Section 13.2 Rotations',
-          },
-        ],
+        content: response.content,
+        citations: response.citations || [],
+        model_name: response.model_name || 'dhruva-guardrailed-gateway-v2',
+        pii_detected_count: response.pii_detected_count || pii.redactionCount,
+        latency_ms: response.latency_ms || 150,
+        is_refusal: response.is_refusal || false,
+        created_at: response.created_at || new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, botResponse]);
+    } catch (err: unknown) {
+      const errorMsgText = err instanceof ApiError ? err.message : 'Unable to complete AI inference. Connecting to live database...';
+      const botResponse: TutorChatMessage = {
+        id: `msg-notice-${Date.now()}`,
+        role: 'assistant',
+        content: `⚠️ **Grounded Response**: ${errorMsgText}`,
+        citations: [],
         model_name: 'dhruva-guardrailed-gateway-v2',
         pii_detected_count: pii.redactionCount,
-        latency_ms: 188,
-        is_refusal: false,
+        latency_ms: 85,
+        is_refusal: true,
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, botResponse]);
+    } finally {
       setIsSubmittingChat(false);
-    }, 700);
+    }
   };
+
+  // Quick Suggestion Prompts
+  const quickSuggestions = [
+    'Explain the core concept in clear, simple terms',
+    'Show a complete Python code example with comments',
+    'Summarize key syllabus points in 3 bullets',
+    'Give me 2 practice questions with solutions',
+  ];
 
   // -------------------------------------------------------------
   // TAB 2: FACULTY QUESTION DRAFTING STATE
   // -------------------------------------------------------------
-  const [draftTopic, setDraftTopic] = useState<string>('AVL Tree Rotations and Height Bounds');
+  const [draftTopic, setDraftTopic] = useState<string>('Search Algorithms and Tree Invariants');
   const [draftDifficulty, setDraftDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD'>('MEDIUM');
   const [draftBloomLevel, setDraftBloomLevel] = useState<'REMEMBER' | 'UNDERSTAND' | 'APPLY' | 'ANALYZE' | 'EVALUATE'>('APPLY');
   const [draftNumQuestions, setDraftNumQuestions] = useState<number>(2);
   const [isDrafting, setIsDrafting] = useState<boolean>(false);
-  const [draftedQuestions, setDraftedQuestions] = useState<DraftQuestionItem[]>([
-    {
-      draft_id: 'd-101',
-      title: 'AVL Node Insertion Rebalancing Condition',
-      question_text: 'What is the maximum permissible balance factor in an AVL Tree before a rotational rebalance is triggered?',
-      question_type: 'MCQ',
-      difficulty: 'MEDIUM',
-      bloom_level: 'APPLY',
-      points: 2.0,
-      options: [
-        { text: 'Absolute difference of 0', is_correct: false },
-        { text: 'Absolute difference of 1', is_correct: true },
-        { text: 'Absolute difference of 2', is_correct: false },
-        { text: 'Unbounded difference', is_correct: false },
-      ],
-      explanation: 'In an AVL tree, the balance factor (height(left) - height(right)) must stay within {-1, 0, +1}. An absolute value of 2 necessitates immediate rotation.',
-    },
-    {
-      draft_id: 'd-102',
-      title: 'Double Rotation Sequence Identification',
-      question_text: 'Given an insertion into the right subtree of the left child (Left-Right case), which sequence of rotations restores the AVL property?',
-      question_type: 'MCQ',
-      difficulty: 'HARD',
-      bloom_level: 'ANALYZE',
-      points: 3.0,
-      options: [
-        { text: 'Single Right Rotation at root', is_correct: false },
-        { text: 'Left Rotation at left child, followed by Right Rotation at root', is_correct: true },
-        { text: 'Right Rotation at left child, followed by Left Rotation at root', is_correct: false },
-        { text: 'Double Left Rotation at root', is_correct: false },
-      ],
-      explanation: 'The Left-Right heavy case requires an initial Left Rotation on the child to convert it into a pure Left-Left case, followed by a Right Rotation on the parent.',
-    },
-  ]);
-
+  const [draftedQuestions, setDraftedQuestions] = useState<DraftQuestionItem[]>([]);
   const [promotedQuestionIds, setPromotedQuestionIds] = useState<Set<string>>(new Set());
   const [draftSuccessToast, setDraftSuccessToast] = useState<string | null>(null);
 
-  const handleGenerateQuestions = () => {
+  const handleGenerateQuestions = async () => {
     if (!draftTopic.trim() || isDrafting) return;
     setIsDrafting(true);
 
-    setTimeout(() => {
-      const newItems: DraftQuestionItem[] = [
-        {
-          draft_id: `d-${Date.now()}-1`,
-          title: `${draftTopic} — Fundamental Concepts`,
-          question_text: `Which algorithmic property guarantees logarithmic height in ${draftTopic}?`,
-          question_type: 'MCQ',
-          difficulty: draftDifficulty,
-          bloom_level: draftBloomLevel,
-          points: draftDifficulty === 'EASY' ? 1.0 : draftDifficulty === 'MEDIUM' ? 2.0 : 3.0,
-          options: [
-            { text: 'Strict height balance condition maintained during mutating operations', is_correct: true },
-            { text: 'Randomized pivot selection during partition steps', is_correct: false },
-            { text: 'Greedy selection of optimal sub-structures', is_correct: false },
-            { text: 'Linear probe hashing resolution', is_correct: false },
-          ],
-          explanation: 'Logarithmic height is guaranteed by maintaining the bounded height invariants after every mutation.',
-        },
-      ];
-      setDraftedQuestions((prev) => [...newItems, ...prev]);
-      setIsDrafting(false);
-      setDraftSuccessToast(`Generated ${newItems.length} grounded draft questions for ${draftTopic}`);
+    try {
+      const response = await api.post<{
+        course_id: string;
+        course_code: string;
+        topic: string;
+        difficulty: string;
+        draft_questions: DraftQuestionItem[];
+        total_generated: number;
+      }>(`/institutions/${tenantSlug}/ai/faculty/draft-questions`, {
+        course_id: currentCourse.id,
+        topic_or_concept: draftTopic,
+        difficulty: draftDifficulty,
+        num_questions: draftNumQuestions,
+      });
+
+      if (response && response.draft_questions && response.draft_questions.length > 0) {
+        setDraftedQuestions((prev) => [...response.draft_questions, ...prev]);
+        setDraftSuccessToast(`✓ Generated ${response.draft_questions.length} grounded draft questions for ${draftTopic}`);
+      } else {
+        setDraftSuccessToast(`✓ Draft questions request processed successfully`);
+      }
       setTimeout(() => setDraftSuccessToast(null), 4000);
-    }, 800);
+    } catch (err: unknown) {
+      const msg = err instanceof ApiError ? err.message : 'Draft generation error';
+      setDraftSuccessToast(`Notice: ${msg}`);
+      setTimeout(() => setDraftSuccessToast(null), 5000);
+    } finally {
+      setIsDrafting(false);
+    }
   };
 
-  const handlePromoteToQuestionBank = (draft: DraftQuestionItem) => {
-    // 1-Click promotion to Question Bank
-    const transformed = transformDraftToQuestionAdmin(
-      draft,
-      user?.institution_id || 'inst-iit-bombay',
-      'qb-ds-algo-01',
-      selectedCourseId
-    );
+  const handlePromoteToQuestionBank = async (draft: DraftQuestionItem) => {
+    try {
+      const banks = await api.get<any[]>(`/institutions/${tenantSlug}/question-banks`).catch(() => []);
+      let bankId = banks.find((b: any) => b.course_id === currentCourse.id)?.id || banks[0]?.id;
 
-    setPromotedQuestionIds((prev) => new Set(prev).add(draft.draft_id));
-    setDraftSuccessToast(
-      `✓ Question "${draft.title}" successfully transferred to Question Bank (Draft ID: ${transformed.id})!`
-    );
-    setTimeout(() => setDraftSuccessToast(null), 5000);
+      if (!bankId) {
+        const newBank = await api.post<any>(`/institutions/${tenantSlug}/question-banks`, {
+          title: `Question Bank — ${currentCourse.code || 'Institutional Core'}`,
+          description: `Auto-generated from Faculty AI Drafting Suite`,
+          course_id: currentCourse.id || undefined,
+        });
+        bankId = newBank.id;
+      }
+
+      const correctIndex = draft.options.findIndex((opt) => opt.is_correct);
+      const correctOptionId = correctIndex >= 0 ? `opt-${correctIndex + 1}` : 'opt-1';
+
+      await api.post(`/institutions/${tenantSlug}/question-banks/${bankId}/questions`, {
+        question_type: draft.question_type,
+        prompt_text: draft.question_text,
+        options: draft.options.map((opt, idx) => ({ id: `opt-${idx + 1}`, text: opt.text })),
+        answer_key: { correct_option_id: correctOptionId },
+        points: draft.points || 1.0,
+        difficulty: draft.difficulty,
+        explanation: draft.explanation,
+      });
+
+      setPromotedQuestionIds((prev) => new Set(prev).add(draft.draft_id));
+      setDraftSuccessToast(
+        `✓ Question "${draft.title}" successfully transferred to Question Bank!`
+      );
+      setTimeout(() => setDraftSuccessToast(null), 5000);
+    } catch (err: unknown) {
+      const errorMsg = err instanceof ApiError ? err.message : 'Could not save question';
+      setDraftSuccessToast(`⚠️ Failed to transfer: ${errorMsg}`);
+      setTimeout(() => setDraftSuccessToast(null), 5000);
+    }
   };
 
   // -------------------------------------------------------------
-  // TAB 3: AUDIT & GATEWAY SAFETY LOGS STATE
+  // TAB 3: AUDIT & GATEWAY SAFETY LOGS STATE (REAL-TIME OLTP)
   // -------------------------------------------------------------
-  const [auditLogs] = useState<AIAuditLog[]>([
-    {
-      id: 'log-801',
-      institution_id: 'inst-iit-bombay',
-      user_id: user?.id || 'usr-student-01',
-      action: 'TUTOR_CHAT',
-      prompt_hash: 'a7b9c1d3e5f20984',
-      pii_detected_count: 0,
-      safety_verdict: 'APPROVED',
-      tokens_used: 342,
-      cost_estimate: 0.00068,
-      metadata_json: { course_code: 'CS201', latency_ms: 124 },
-      created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    },
-    {
-      id: 'log-802',
-      institution_id: 'inst-iit-bombay',
-      user_id: user?.id || 'usr-student-01',
-      action: 'BLOCKED_PROMPT',
-      prompt_hash: 'f948c21a084c7e2b',
-      pii_detected_count: 0,
-      safety_verdict: 'BLOCKED_INJECTION',
-      tokens_used: 0,
-      cost_estimate: 0.0,
-      metadata_json: { threat: 'INSTRUCTION_OVERRIDE', blocked_at: 'edge_guard' },
-      created_at: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
-    },
-    {
-      id: 'log-803',
-      institution_id: 'inst-iit-bombay',
-      user_id: user?.id || 'usr-student-01',
-      action: 'TUTOR_CHAT',
-      prompt_hash: 'c8273b1940e729a1',
-      pii_detected_count: 1,
-      safety_verdict: 'SANITIZED_PII',
-      tokens_used: 410,
-      cost_estimate: 0.00082,
-      metadata_json: { redacted_types: ['STUDENT_ROLL_NUMBER'] },
-      created_at: new Date(Date.now() - 1000 * 60 * 42).toISOString(),
-    },
-    {
-      id: 'log-804',
-      institution_id: 'inst-iit-bombay',
-      user_id: user?.id || 'usr-faculty-01',
-      action: 'DRAFT_QUESTIONS',
-      prompt_hash: '772b9a84ec01289f',
-      pii_detected_count: 0,
-      safety_verdict: 'APPROVED',
-      tokens_used: 685,
-      cost_estimate: 0.00137,
-      metadata_json: { topic: 'AVL Rotations', num_questions: 2 },
-      created_at: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    },
-  ]);
+  const [auditLogs, setAuditLogs] = useState<AIAuditLog[]>([]);
+  const [isAuditLoading, setIsAuditLoading] = useState(false);
+
+  const fetchAuditLogs = async () => {
+    if (!tenantSlug || !isAdmin) return;
+    setIsAuditLoading(true);
+    try {
+      const logs = await api.get<AIAuditLog[]>(`/institutions/${tenantSlug}/ai/audit-logs`);
+      setAuditLogs(logs || []);
+    } catch {
+      setAuditLogs([]);
+    } finally {
+      setIsAuditLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'audit') {
+      fetchAuditLogs();
+    }
+  }, [activeTab, tenantSlug, isAdmin]);
 
   return (
-    <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Page Header */}
+    <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      {/* Top Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div
               style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '8px',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                width: '38px',
+                height: '38px',
+                borderRadius: '10px',
+                backgroundColor: 'rgba(59, 130, 246, 0.12)',
                 color: '#3b82f6',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <Sparkles size={20} />
+              <Sparkles size={22} />
             </div>
-            <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-              Guardrailed AI Gateway & Retrieval
-            </h1>
-            <Badge variant="default">Phase 9</Badge>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h1 style={{ fontSize: '24px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                  Dhruva.AI Conversational Intelligence
+                </h1>
+                <Badge variant="default">v2.0 Pro</Badge>
+              </div>
+              <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--text-secondary)' }}>
+                Multi-turn pedagogical assistant grounded in verified course syllabi and institutional knowledge.
+              </p>
+            </div>
           </div>
-          <p style={{ margin: '6px 0 0 0', fontSize: '14px', color: 'var(--text-secondary)' }}>
-            Zero-leak grounded student tutoring and faculty question drafting powered by pgvector semantic retrieval and PII redaction.
-          </p>
         </div>
 
-        {/* Status Indicators */}
+        {/* Live Provider Status & Model Badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              backgroundColor: providerStatus?.configured_providers.google_gemini.configured
+                ? 'rgba(59, 130, 246, 0.1)'
+                : 'rgba(16, 185, 129, 0.1)',
+              border: providerStatus?.configured_providers.google_gemini.configured
+                ? '1px solid rgba(59, 130, 246, 0.3)'
+                : '1px solid rgba(16, 185, 129, 0.3)',
+              fontSize: '12px',
+              fontWeight: 600,
+              color: providerStatus?.configured_providers.google_gemini.configured ? '#3b82f6' : '#10b981',
+            }}
+          >
+            <Cpu size={14} />
+            <span>
+              {providerStatus?.active_provider === 'google_gemini'
+                ? `Gemini: ${providerStatus.active_model}`
+                : providerStatus?.active_provider === 'nvidia_ai'
+                ? `NVIDIA NIM: ${providerStatus.active_model}`
+                : 'Grounded Academic Engine'}
+            </span>
+          </div>
+
           <div
             style={{
               display: 'flex',
@@ -371,8 +724,9 @@ export default function AIGatewayWorkspace() {
             }}
           >
             <ShieldCheck size={14} />
-            Tenant Isolated (RLS)
+            Tenant Isolated
           </div>
+
           <div
             style={{
               display: 'flex',
@@ -388,7 +742,7 @@ export default function AIGatewayWorkspace() {
             }}
           >
             <Lock size={14} />
-            Zero-PII Egress Active
+            PII Redacted
           </div>
         </div>
       </div>
@@ -409,7 +763,7 @@ export default function AIGatewayWorkspace() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-secondary)' }}>
-            Active Course Scope:
+            Course Context:
           </span>
           <select
             value={selectedCourseId}
@@ -424,11 +778,15 @@ export default function AIGatewayWorkspace() {
               fontWeight: 500,
             }}
           >
-            {DEMO_COURSES.map((course) => (
-              <option key={course.id} value={course.id}>
-                {course.code}: {course.name} ({course.department})
-              </option>
-            ))}
+            {courses.length > 0 ? (
+              courses.map((course) => (
+                <option key={course.id} value={course.id}>
+                  {course.code}: {course.title || (course as any).name}
+                </option>
+              ))
+            ) : (
+              <option value="">No courses yet (Create in Academic workspace)</option>
+            )}
           </select>
         </div>
 
@@ -451,7 +809,7 @@ export default function AIGatewayWorkspace() {
             }}
           >
             <BookOpen size={14} />
-            Student Grounded Tutor
+            Academic Tutor
           </button>
 
           {isStaff && (
@@ -522,11 +880,12 @@ export default function AIGatewayWorkspace() {
       )}
 
       {/* ============================================================== */}
-      {/* TAB 1: STUDENT GROUNDED AI TUTOR                                */}
+      {/* TAB 1: ACADEMIC TUTOR CHAT (MULTI-TURN CONVERSATIONAL UI)       */}
       {/* ============================================================== */}
       {activeTab === 'tutor' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '20px' }}>
-          {/* Main Chat Thread */}
+        <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr 300px', gap: '16px', alignItems: 'stretch' }}>
+          
+          {/* LEFT: Conversation History Sidebar */}
           <div
             style={{
               backgroundColor: 'var(--bg-surface)',
@@ -534,10 +893,120 @@ export default function AIGatewayWorkspace() {
               border: '1px solid var(--border-subtle)',
               display: 'flex',
               flexDirection: 'column',
-              minHeight: '620px',
+              padding: '14px',
+              gap: '12px',
+              maxHeight: '750px',
+              overflow: 'hidden',
             }}
           >
-            {/* Grounding Guarantee Banner */}
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleNewConversation}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', width: '100%' }}
+            >
+              <Plus size={14} />
+              New Chat
+            </Button>
+
+            <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Chat History
+            </div>
+
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {isConversationsLoading ? (
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '12px 4px', textAlign: 'center' }}>
+                  Loading history...
+                </div>
+              ) : conversations.length === 0 ? (
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '16px 8px', textAlign: 'center', lineHeight: 1.4 }}>
+                  No prior sessions yet. Your questions and follow-ups will be saved here.
+                </div>
+              ) : (
+                conversations.map((c) => {
+                  const isActive = c.id === activeConversationId;
+                  return (
+                    <div
+                      key={c.id}
+                      onClick={() => handleSelectConversation(c.id)}
+                      style={{
+                        padding: '8px 10px',
+                        borderRadius: '6px',
+                        backgroundColor: isActive ? 'rgba(59, 130, 246, 0.12)' : 'transparent',
+                        border: isActive ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid transparent',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '6px',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) e.currentTarget.style.backgroundColor = 'var(--bg-app)';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
+                        <MessageSquare size={13} color={isActive ? '#3b82f6' : 'var(--text-muted)'} style={{ flexShrink: 0 }} />
+                        <span
+                          style={{
+                            fontSize: '12px',
+                            fontWeight: isActive ? 600 : 400,
+                            color: isActive ? '#3b82f6' : 'var(--text-primary)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {c.title || 'Chat Session'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={(e) => handleDeleteConversation(e, c.id)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          padding: '2px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          opacity: 0.6,
+                        }}
+                        title="Delete chat session"
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = '#ef4444';
+                          e.currentTarget.style.opacity = '1';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = 'var(--text-muted)';
+                          e.currentTarget.style.opacity = '0.6';
+                        }}
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* CENTER: Main Chat Conversation View */}
+          <div
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              borderRadius: 'var(--radius-lg)',
+              border: '1px solid var(--border-subtle)',
+              display: 'flex',
+              flexDirection: 'column',
+              minHeight: '700px',
+              maxHeight: '750px',
+            }}
+          >
+            {/* Grounding Guarantee Header Banner */}
             <div
               style={{
                 padding: '10px 16px',
@@ -545,30 +1014,47 @@ export default function AIGatewayWorkspace() {
                 borderBottom: '1px solid var(--border-subtle)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
+                justifyContent: 'space-between',
                 fontSize: '12px',
                 color: 'var(--text-secondary)',
               }}
             >
-              <ShieldCheck size={16} color="#3b82f6" />
-              <span>
-                <strong>Grounding Guarantee:</strong> Responses are grounded exclusively in authorized <strong>{currentCourse.code}</strong> course documents. AI outputs do not alter official grades or academic records.
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldCheck size={16} color="#3b82f6" />
+                <span>
+                  Context Active: <strong>{currentCourse.code}</strong> • Responses grounded in official materials. Official grades remain inviolable.
+                </span>
+              </div>
+              {activeConversationId && (
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
+                  ID: {activeConversationId.slice(0, 8)}...
+                </span>
+              )}
             </div>
 
             {/* Messages Scroll Area */}
-            <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div
+              ref={chatScrollRef}
+              style={{
+                flex: 1,
+                padding: '20px',
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px',
+              }}
+            >
               {messages.map((msg) => (
                 <div
                   key={msg.id}
                   style={{
                     alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                    maxWidth: '82%',
+                    maxWidth: msg.role === 'user' ? '78%' : '88%',
                     backgroundColor:
                       msg.role === 'user'
                         ? '#3b82f6'
                         : msg.is_refusal
-                        ? 'rgba(239, 68, 68, 0.1)'
+                        ? 'rgba(239, 68, 68, 0.08)'
                         : 'var(--bg-app)',
                     color: msg.role === 'user' ? '#ffffff' : 'var(--text-primary)',
                     borderRadius: 'var(--radius-lg)',
@@ -577,16 +1063,61 @@ export default function AIGatewayWorkspace() {
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '8px',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                   }}
                 >
-                  <div style={{ fontSize: '11px', opacity: 0.8, display: 'flex', justifyContent: 'space-between', gap: '12px' }}>
-                    <span>{msg.role === 'user' ? 'You (Verified Student)' : 'Dhruva.AI Grounded Assistant'}</span>
-                    <span>{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <div
+                    style={{
+                      fontSize: '11px',
+                      opacity: 0.8,
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: '12px',
+                      borderBottom: msg.role === 'user' ? 'none' : '1px solid rgba(125,125,125,0.1)',
+                      paddingBottom: '4px',
+                    }}
+                  >
+                    <span style={{ fontWeight: 600 }}>
+                      {msg.role === 'user' ? 'You' : 'Dhruva.AI Assistant'}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {msg.latency_ms && (
+                        <span style={{ fontSize: '10px', color: msg.role === 'user' ? '#dbeafe' : 'var(--text-muted)' }}>
+                          {msg.latency_ms}ms
+                        </span>
+                      )}
+                      <span>
+                        {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {msg.role === 'assistant' && (
+                        <button
+                          onClick={() => handleCopyMessage(msg.id, msg.content)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            color: 'var(--text-muted)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '2px',
+                          }}
+                          title="Copy response"
+                        >
+                          {copiedMessageId === msg.id ? <Check size={12} color="#10b981" /> : <Copy size={12} />}
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  <div style={{ fontSize: '14px', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                    {msg.content}
-                  </div>
+                  {/* Rendered content */}
+                  {msg.role === 'assistant' ? (
+                    <FormattedMessage content={msg.content} />
+                  ) : (
+                    <div style={{ fontSize: '14px', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                      {msg.content}
+                    </div>
+                  )}
 
                   {/* Redaction Notice */}
                   {msg.pii_detected_count !== undefined && msg.pii_detected_count > 0 && (
@@ -647,27 +1178,75 @@ export default function AIGatewayWorkspace() {
                 <div
                   style={{
                     alignSelf: 'flex-start',
-                    padding: '10px 14px',
+                    padding: '12px 16px',
                     borderRadius: 'var(--radius-md)',
                     backgroundColor: 'var(--bg-app)',
+                    border: '1px solid var(--border-subtle)',
                     color: 'var(--text-secondary)',
                     fontSize: '13px',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '8px',
+                    gap: '10px',
                   }}
                 >
-                  <RefreshCw size={14} className="animate-spin" />
-                  Retrieving grounded course documents & synthesizing answer...
+                  <RefreshCw size={15} style={{ animation: 'spin 1.2s linear infinite' }} />
+                  <span>Synthesizing response with multi-turn context and verified curriculum...</span>
                 </div>
               )}
+            </div>
+
+            {/* Quick Suggestion Pills */}
+            <div
+              style={{
+                padding: '6px 16px',
+                borderTop: '1px solid var(--border-subtle)',
+                backgroundColor: 'rgba(125, 125, 125, 0.03)',
+                display: 'flex',
+                gap: '8px',
+                overflowX: 'auto',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'flex', alignItems: 'center' }}>
+                Prompt ideas:
+              </span>
+              {quickSuggestions.map((sugg, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => handleSendChat(sugg)}
+                  disabled={isSubmittingChat}
+                  style={{
+                    background: 'none',
+                    border: '1px solid var(--border-subtle)',
+                    padding: '4px 10px',
+                    borderRadius: '14px',
+                    fontSize: '11px',
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#3b82f6';
+                    e.currentTarget.style.color = '#3b82f6';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                  }}
+                >
+                  <ChevronRight size={10} />
+                  {sugg}
+                </button>
+              ))}
             </div>
 
             {/* Client Pre-flight PII Warning Preview */}
             {piiPreview && piiPreview.hasPII && (
               <div
                 style={{
-                  margin: '0 16px 8px 16px',
+                  margin: '8px 16px 0 16px',
                   padding: '8px 12px',
                   borderRadius: 'var(--radius-md)',
                   backgroundColor: 'rgba(245, 158, 11, 0.12)',
@@ -690,7 +1269,7 @@ export default function AIGatewayWorkspace() {
             {promptSecurityPreview && !promptSecurityPreview.isSafe && (
               <div
                 style={{
-                  margin: '0 16px 8px 16px',
+                  margin: '8px 16px 0 16px',
                   padding: '8px 12px',
                   borderRadius: 'var(--radius-md)',
                   backgroundColor: 'rgba(239, 68, 68, 0.12)',
@@ -712,7 +1291,7 @@ export default function AIGatewayWorkspace() {
             {/* Chat Input Bar */}
             <div
               style={{
-                padding: '16px',
+                padding: '14px 16px',
                 borderTop: '1px solid var(--border-subtle)',
                 display: 'flex',
                 gap: '10px',
@@ -737,7 +1316,7 @@ export default function AIGatewayWorkspace() {
               />
               <Button
                 variant="primary"
-                onClick={handleSendChat}
+                onClick={() => handleSendChat()}
                 disabled={!chatInput.trim() || isSubmittingChat}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
               >
@@ -747,7 +1326,7 @@ export default function AIGatewayWorkspace() {
             </div>
           </div>
 
-          {/* Sidebar Context & Provenance Panel */}
+          {/* RIGHT: Syllabus Scope & Knowledge Panel */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <Card style={{ padding: '16px' }}>
               <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -784,6 +1363,16 @@ export default function AIGatewayWorkspace() {
                 <li>Tenant data isolated via PostgreSQL Row-Level Security</li>
                 <li>Cross-tenant queries fail with explicit rejection</li>
               </ul>
+            </Card>
+
+            <Card style={{ padding: '16px' }}>
+              <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Cpu size={16} color="#8b5cf6" />
+                AI Gateway Architecture
+              </div>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: 0, lineHeight: 1.5 }}>
+                Dhruva.AI connects to Gemini 1.5 Flash with fallback to NVIDIA NIM and Grounded Core. Deterministic mastery computations and grades are never overridden.
+              </p>
             </Card>
           </div>
         </div>
@@ -881,7 +1470,7 @@ export default function AIGatewayWorkspace() {
               disabled={!draftTopic.trim() || isDrafting}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '8px' }}
             >
-              {isDrafting ? <RefreshCw size={16} className="animate-spin" /> : <Sparkles size={16} />}
+              {isDrafting ? <RefreshCw size={16} style={{ animation: 'spin 1.2s linear infinite' }} /> : <Sparkles size={16} />}
               {isDrafting ? 'Drafting Grounded Questions...' : 'Generate Questions'}
             </Button>
           </Card>
@@ -926,7 +1515,6 @@ export default function AIGatewayWorkspace() {
                       </h3>
                     </div>
 
-                    {/* 1-Click Send to Question Bank Button */}
                     <Button
                       variant={isPromoted ? 'outline' : 'primary'}
                       onClick={() => handlePromoteToQuestionBank(q)}
@@ -997,68 +1585,84 @@ export default function AIGatewayWorkspace() {
       {/* ============================================================== */}
       {activeTab === 'audit' && isAdmin && (
         <Card style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
             <div>
               <h2 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
                 AI Gateway Audit & Redaction Log
               </h2>
               <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>
-                Complete immutable record of prompts, PII scrubbing actions, prompt injection blocks, and token consumption.
+                Live database audit stream of prompts, PII scrubbing actions, security intercepts, and token consumption.
               </p>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchAuditLogs}
+              disabled={isAuditLoading}
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <RefreshCw size={14} style={{ animation: isAuditLoading ? 'spin 1s linear infinite' : 'none' }} />
+              {isAuditLoading ? 'Refreshing...' : 'Refresh Logs'}
+            </Button>
           </div>
 
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-              <thead>
-                <tr style={{ borderBottom: '1px solid var(--border-subtle)', textAlign: 'left', color: 'var(--text-muted)' }}>
-                  <th style={{ padding: '10px' }}>Timestamp</th>
-                  <th style={{ padding: '10px' }}>Action Type</th>
-                  <th style={{ padding: '10px' }}>Prompt Hash</th>
-                  <th style={{ padding: '10px' }}>Safety Verdict</th>
-                  <th style={{ padding: '10px' }}>PII Redactions</th>
-                  <th style={{ padding: '10px' }}>Tokens</th>
-                  <th style={{ padding: '10px' }}>Cost Est.</th>
-                </tr>
-              </thead>
-              <tbody>
-                {auditLogs.map((log) => (
-                  <tr key={log.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
-                    <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>
-                      {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </td>
-                    <td style={{ padding: '10px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {log.action}
-                    </td>
-                    <td style={{ padding: '10px', fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-muted)' }}>
-                      {log.prompt_hash}
-                    </td>
-                    <td style={{ padding: '10px' }}>
-                      <Badge
-                        variant={
-                          log.safety_verdict === 'APPROVED'
-                            ? 'success'
-                            : log.safety_verdict === 'SANITIZED_PII'
-                            ? 'warning'
-                            : 'danger'
-                        }
-                      >
-                        {log.safety_verdict}
-                      </Badge>
-                    </td>
-                    <td style={{ padding: '10px', fontWeight: 600, color: log.pii_detected_count > 0 ? '#f59e0b' : 'var(--text-secondary)' }}>
-                      {log.pii_detected_count}
-                    </td>
-                    <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>
-                      {log.tokens_used}
-                    </td>
-                    <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>
-                      ${log.cost_estimate.toFixed(5)}
-                    </td>
+            {auditLogs.length === 0 ? (
+              <div style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>
+                No AI safety events recorded yet for this institution. Interactive tutor chats and draft generations will appear here in real time.
+              </div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border-subtle)', textAlign: 'left', color: 'var(--text-muted)' }}>
+                    <th style={{ padding: '10px' }}>Timestamp</th>
+                    <th style={{ padding: '10px' }}>Action Type</th>
+                    <th style={{ padding: '10px' }}>Prompt Hash</th>
+                    <th style={{ padding: '10px' }}>Safety Verdict</th>
+                    <th style={{ padding: '10px' }}>PII Redactions</th>
+                    <th style={{ padding: '10px' }}>Tokens</th>
+                    <th style={{ padding: '10px' }}>Cost Est.</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {auditLogs.map((log) => (
+                    <tr key={log.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>
+                        {new Date(log.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </td>
+                      <td style={{ padding: '10px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {log.action}
+                      </td>
+                      <td style={{ padding: '10px', fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        {log.prompt_hash}
+                      </td>
+                      <td style={{ padding: '10px' }}>
+                        <Badge
+                          variant={
+                            log.safety_verdict === 'APPROVED'
+                              ? 'success'
+                              : log.safety_verdict === 'SANITIZED_PII'
+                              ? 'warning'
+                              : 'danger'
+                          }
+                        >
+                          {log.safety_verdict}
+                        </Badge>
+                      </td>
+                      <td style={{ padding: '10px', fontWeight: 600, color: log.pii_detected_count > 0 ? '#f59e0b' : 'var(--text-secondary)' }}>
+                        {log.pii_detected_count}
+                      </td>
+                      <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>
+                        {log.tokens_used}
+                      </td>
+                      <td style={{ padding: '10px', color: 'var(--text-secondary)' }}>
+                        ${log.cost_estimate.toFixed(5)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </Card>
       )}

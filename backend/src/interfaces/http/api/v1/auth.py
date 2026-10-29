@@ -1,20 +1,24 @@
 """Dhruva.AI V2 — Authentication & Session API Routes.
 
 Implements:
+- POST /auth/register
 - POST /auth/login
 - POST /auth/refresh
 - POST /auth/logout
 - GET /auth/me
+- GET /auth/institutions
 """
 
-from typing import Optional
+from typing import List, Optional
 from fastapi import APIRouter, Cookie, Depends, Header, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.application.identity.auth_service import AuthService
 from src.core.config import get_settings
 from src.core.errors import AuthenticationError
 from src.domain.identity.models import User
+from src.domain.identity.roles import get_permissions_for_role
 from src.infrastructure.persistence.postgres.database import get_db_session
+from src.infrastructure.repositories.institution_repository import InstitutionRepository
 from src.infrastructure.repositories.user_repository import UserRepository
 from src.interfaces.http.dependencies import (
     build_response,
@@ -26,9 +30,11 @@ from src.interfaces.http.schemas.auth import (
     LoginResponseData,
     RefreshResponseData,
     RefreshTokenRequest,
+    RegisterUserRequest,
     UserResponse,
 )
 from src.interfaces.http.schemas.envelope import ApiResponse
+from src.interfaces.http.schemas.tenant import InstitutionResponse
 
 
 settings = get_settings()
@@ -61,6 +67,102 @@ def _clear_auth_cookies(response: Response) -> None:
     """Clear authentication cookies on logout."""
     response.delete_cookie(key="access_token", path="/")
     response.delete_cookie(key="refresh_token", path="/")
+
+
+@router.get(
+    "/institutions",
+    response_model=ApiResponse[List[InstitutionResponse]],
+    summary="List Active Institutions",
+)
+async def list_institutions(
+    request: Request,
+    session: AsyncSession = Depends(get_db_session),
+) -> ApiResponse[List[InstitutionResponse]]:
+    """List available institutions for registration and onboarding."""
+    repo = InstitutionRepository(session)
+    insts = await repo.list_all(limit=100)
+    data = [InstitutionResponse.model_validate(inst) for inst in insts if inst.status == "ACTIVE"]
+    return build_response(data=data, request=request)
+
+
+@router.post(
+    "/register",
+    response_model=ApiResponse[LoginResponseData],
+    status_code=status.HTTP_201_CREATED,
+    summary="Self-Service User Registration",
+)
+async def register(
+    payload: RegisterUserRequest,
+    request: Request,
+    response: Response,
+    session: AsyncSession = Depends(get_db_session),
+) -> ApiResponse[LoginResponseData]:
+    """Register a new student or faculty account, issue session tokens, and set secure cookies."""
+    auth_service = AuthService(session)
+    inst_repo = InstitutionRepository(session)
+    request_id = get_request_id(request)
+
+    # 1. Resolve institution
+    institution_id = None
+    if payload.institution_slug:
+        inst = await inst_repo.get_by_slug(payload.institution_slug)
+        if not inst:
+            raise AuthenticationError(f"Institution '{payload.institution_slug}' not found", code="INSTITUTION_NOT_FOUND")
+        institution_id = inst.id
+    else:
+        # Try domain match
+        domain = payload.email.split("@")[-1].lower()
+        inst = await inst_repo.get_by_domain(domain)
+        if inst:
+            institution_id = inst.id
+        else:
+            # Fallback to first active institution
+            active_insts = await inst_repo.list_all(limit=1)
+            if active_insts:
+                institution_id = active_insts[0].id
+
+    # 2. Register user
+    created_user = await auth_service.register_user(
+        email=payload.email,
+        password=payload.password,
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        role_type=payload.role,
+        institution_id=institution_id,
+        phone=payload.phone,
+        request_id=request_id,
+    )
+
+    # 3. Issue session tokens
+    access_token, refresh_token, expires_in = await auth_service.issue_tokens(created_user)
+    _set_auth_cookies(response, access_token, refresh_token)
+
+    roles = [ur.role.code for ur in created_user.user_roles if ur.role]
+    perms = list(get_permissions_for_role(payload.role))
+
+    user_dto = UserResponse(
+        id=created_user.id,
+        institution_id=created_user.institution_id,
+        institution_slug=inst.slug if inst else None,
+        email=created_user.email,
+        first_name=created_user.first_name,
+        last_name=created_user.last_name,
+        full_name=created_user.full_name,
+        phone=created_user.phone,
+        status=created_user.status,
+        roles=roles,
+        permissions=perms,
+        last_login_at=created_user.last_login_at,
+        created_at=created_user.created_at,
+    )
+
+    data = LoginResponseData(
+        user=user_dto,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=expires_in,
+    )
+    return build_response(data=data, request=request)
 
 
 @router.post(

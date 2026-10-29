@@ -50,3 +50,13 @@ export interface AuthState {
   isLoading: boolean;
   error: string | null;
 }
+
+export interface RegisterData {
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  phone?: string;
+  role?: SystemRole;
+  institution_slug?: string;
+}

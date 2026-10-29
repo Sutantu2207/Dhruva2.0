@@ -7,10 +7,10 @@ import type { PIIDetectionResult, PromptInjectionCheckResult, DraftQuestionItem 
 import type { QuestionAdmin } from '../../types/assessment.ts';
 
 // Regex patterns for client-side pre-flight detection
-const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
-const PHONE_REGEX = /(?:\+?(\d{1,3}))?[-. (]*(\d{3})[-. )]*(\d{3})[-. ]*(\d{4})(?: *x(\d+))?/g;
-const ROLL_NO_REGEX = /\b(?:[12]\d{3}[A-Z]{2,4}\d{3,5}|ROLL[:\s-]*[A-Z0-9]+)\b/gi;
-const NATIONAL_ID_REGEX = /\b(?:\d{4}[-\s]?\d{4}[-\s]?\d{4}|\d{3}-\d{2}-\d{4})\b/g;
+const EMAIL_PATTERN = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
+const PHONE_PATTERN = /(?:\+?(\d{1,3}))?[-. (]*(\d{3})[-. )]*(\d{3})[-. ]*(\d{4})(?: *x(\d+))?/g;
+const ROLL_NO_PATTERN = /\b(?:[12]\d{3}[A-Z]{2,4}\d{3,5}|ROLL[:\s-]*[A-Z0-9]+)\b/gi;
+const NATIONAL_ID_PATTERN = /\b(?:\d{4}[-\s]?\d{4}[-\s]?\d{4}|\d{3}-\d{2}-\d{4})\b/g;
 
 // Adversarial patterns for prompt injection detection
 const INJECTION_PATTERNS: Array<{ pattern: RegExp; threat: string }> = [
@@ -34,44 +34,44 @@ const INJECTION_PATTERNS: Array<{ pattern: RegExp; threat: string }> = [
 
 /**
  * Pre-flight client PII detector and sanitizer.
- * Provides instant feedback before network transmission.
+ * Performs single-pass tokenization and redactions, ensuring zero regex state leak.
  */
 export function detectAndSanitizePII(text: string): PIIDetectionResult {
   const detectedTypes: string[] = [];
   let redactionCount = 0;
   let sanitized = text;
 
-  if (EMAIL_REGEX.test(text)) {
-    detectedTypes.push('EMAIL_ADDRESS');
-    sanitized = sanitized.replace(EMAIL_REGEX, () => {
-      redactionCount++;
-      return '[REDACTED_EMAIL]';
-    });
-  }
+  let emailMatches = 0;
+  sanitized = sanitized.replace(new RegExp(EMAIL_PATTERN.source, 'gi'), () => {
+    emailMatches++;
+    redactionCount++;
+    return '[REDACTED_EMAIL]';
+  });
+  if (emailMatches > 0) detectedTypes.push('EMAIL_ADDRESS');
 
-  if (PHONE_REGEX.test(text)) {
-    detectedTypes.push('PHONE_NUMBER');
-    sanitized = sanitized.replace(PHONE_REGEX, () => {
-      redactionCount++;
-      return '[REDACTED_PHONE]';
-    });
-  }
+  let phoneMatches = 0;
+  sanitized = sanitized.replace(new RegExp(PHONE_PATTERN.source, 'g'), () => {
+    phoneMatches++;
+    redactionCount++;
+    return '[REDACTED_PHONE]';
+  });
+  if (phoneMatches > 0) detectedTypes.push('PHONE_NUMBER');
 
-  if (ROLL_NO_REGEX.test(text)) {
-    detectedTypes.push('STUDENT_ROLL_NUMBER');
-    sanitized = sanitized.replace(ROLL_NO_REGEX, () => {
-      redactionCount++;
-      return '[REDACTED_STUDENT_ID]';
-    });
-  }
+  let rollMatches = 0;
+  sanitized = sanitized.replace(new RegExp(ROLL_NO_PATTERN.source, 'gi'), () => {
+    rollMatches++;
+    redactionCount++;
+    return '[REDACTED_STUDENT_ID]';
+  });
+  if (rollMatches > 0) detectedTypes.push('STUDENT_ROLL_NUMBER');
 
-  if (NATIONAL_ID_REGEX.test(text)) {
-    detectedTypes.push('NATIONAL_ID');
-    sanitized = sanitized.replace(NATIONAL_ID_REGEX, () => {
-      redactionCount++;
-      return '[REDACTED_NATIONAL_ID]';
-    });
-  }
+  let nationalIdMatches = 0;
+  sanitized = sanitized.replace(new RegExp(NATIONAL_ID_PATTERN.source, 'g'), () => {
+    nationalIdMatches++;
+    redactionCount++;
+    return '[REDACTED_NATIONAL_ID]';
+  });
+  if (nationalIdMatches > 0) detectedTypes.push('NATIONAL_ID');
 
   return {
     hasPII: detectedTypes.length > 0,
@@ -86,6 +86,7 @@ export function detectAndSanitizePII(text: string): PIIDetectionResult {
  */
 export function checkPromptSecurity(prompt: string): PromptInjectionCheckResult {
   for (const { pattern, threat } of INJECTION_PATTERNS) {
+    pattern.lastIndex = 0;
     if (pattern.test(prompt)) {
       return {
         isSafe: false,
@@ -106,7 +107,8 @@ export function transformDraftToQuestionAdmin(
   draft: DraftQuestionItem,
   institutionId: string,
   questionBankId: string,
-  courseId?: string
+  courseId?: string,
+  customId?: string
 ): QuestionAdmin {
   const options = draft.options.map((opt, idx) => ({
     id: `opt-${idx + 1}`,
@@ -117,7 +119,7 @@ export function transformDraftToQuestionAdmin(
   const correctOptionId = correctIndex >= 0 ? `opt-${correctIndex + 1}` : 'opt-1';
 
   return {
-    id: `qb-q-${draft.draft_id}-${Date.now()}`,
+    id: customId || `qb-q-${draft.draft_id}-100`,
     institution_id: institutionId,
     question_bank_id: questionBankId,
     question_type: draft.question_type,
@@ -143,3 +145,4 @@ export function transformDraftToQuestionAdmin(
 export function formatCitationBadge(citationId: string, title: string, courseCode: string): string {
   return `[${citationId}: ${courseCode} • ${title}]`;
 }
+

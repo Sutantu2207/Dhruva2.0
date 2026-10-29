@@ -4,7 +4,17 @@
 
 import { ApiErrorResponse, ApiResponse, ErrorBody } from '@/types/api';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+function getApiBaseUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!envUrl) {
+    return 'http://localhost:8000/api/v1';
+  }
+  const clean = envUrl.trim().replace(/\/+$/, '');
+  if (!clean.endsWith('/api/v1')) {
+    return `${clean}/api/v1`;
+  }
+  return clean;
+}
 
 export class ApiError extends Error {
   code: string;
@@ -30,7 +40,17 @@ class HttpClient {
   }
 
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = endpoint.startsWith('http') ? endpoint : `${API_BASE_URL}${endpoint}`;
+    let cleanEndpoint = endpoint.trim();
+    if (cleanEndpoint.startsWith('/api/v1')) {
+      cleanEndpoint = cleanEndpoint.slice(7);
+    }
+    if (!cleanEndpoint.startsWith('/')) {
+      cleanEndpoint = `/${cleanEndpoint}`;
+    }
+    const baseUrl = getApiBaseUrl();
+    const url = endpoint.startsWith('http://') || endpoint.startsWith('https://')
+      ? endpoint
+      : `${baseUrl}${cleanEndpoint}`;
     const headers: Record<string, string> = {
       Accept: 'application/json',
       ...((options.headers as Record<string, string>) || {}),
@@ -72,7 +92,21 @@ class HttpClient {
     }
 
     const successData = data as ApiResponse<T>;
-    return successData.data;
+    const payload = successData.data;
+    if (payload && (typeof payload === 'object' || Array.isArray(payload))) {
+      try {
+        if (!('data' in (payload as Record<string, unknown>))) {
+          Object.defineProperty(payload, 'data', {
+            value: payload,
+            enumerable: false,
+            configurable: true,
+          });
+        }
+      } catch {
+        // Ignore if non-extensible
+      }
+    }
+    return payload;
   }
 
   get<T>(endpoint: string, options?: RequestInit): Promise<T> {

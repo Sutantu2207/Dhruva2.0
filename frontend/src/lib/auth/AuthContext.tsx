@@ -6,10 +6,11 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api/client';
-import { AuthState, Institution, LoginResponseData, User } from '@/types/auth';
+import { AuthState, Institution, LoginResponseData, RegisterData, User } from '@/types/auth';
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>;
+  register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -59,6 +60,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const register = async (data: RegisterData) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await api.post<LoginResponseData>('/auth/register', data);
+      api.setToken(result.access_token);
+      setUser(result.user);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+      } else {
+        setError('Registration failed. Please check your network connection.');
+      }
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = async () => {
     try {
       await api.post('/auth/logout');
@@ -80,6 +100,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         error,
         login,
+        register,
         logout,
         refreshProfile,
       }}

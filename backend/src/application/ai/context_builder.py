@@ -123,9 +123,20 @@ class ContextBuilder:
         # 4. Out-of-syllabus heuristic detection
         is_out_of_syllabus = False
         query_words = set(user_query.lower().split())
-        unrelated_flags = {"cooking", "recipe", "celebrity", "crypto", "astrology", "stock trading"}
+        unrelated_flags = {"cooking", "recipe", "celebrity", "crypto", "astrology", "stock trading", "sports betting", "casino"}
         if any(w in query_words for w in unrelated_flags):
             is_out_of_syllabus = True
+
+        # Ensure at least course-level citation exists for legitimate academic queries
+        if not citations and not is_out_of_syllabus:
+            citations.append({
+                "citation_id": f"cit-crs-{course.id}",
+                "source_type": "COURSE_SPECIFICATION",
+                "entity_id": str(course.id),
+                "title": f"{course.title} Syllabus Specification",
+                "course_code": course.code,
+                "provenance": f"{course.code}/Course-Specification",
+            })
 
         assembled_text = "\n".join(context_lines)
 

@@ -63,8 +63,9 @@ class RefreshResponseData(BaseModel):
 
 class RegisterUserRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=8, description="Password must be at least 8 characters")
     first_name: str = Field(min_length=1, max_length=128)
     last_name: str = Field(min_length=1, max_length=128)
     role: SystemRole = SystemRole.STUDENT
     phone: Optional[str] = Field(default=None, max_length=32)
+    institution_slug: Optional[str] = Field(default=None, description="Slug of the institution to register under")

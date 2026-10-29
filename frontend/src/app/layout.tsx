@@ -3,7 +3,7 @@ import './globals.css';
 import { AuthProvider } from '@/lib/auth/AuthContext';
 
 export const metadata: Metadata = {
-  title: 'Dhruva.AI V2 — Institutional Intelligence Operating System',
+  title: 'Dhruva.AI — Institutional Intelligence Operating System',
   description:
     'Multi-tenant institutional learning, curriculum governance, mastery measurement, and career intelligence platform.',
 };
@@ -16,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        <div style={{ position: 'relative', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
+          <AuthProvider>{children}</AuthProvider>
+        </div>
       </body>
     </html>
   );

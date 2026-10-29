@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import StaticPool
 
 # Ensure test environment settings
-os.environ["ENVIRONMENT"] = "development"
+os.environ["ENVIRONMENT"] = "test"
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["SECRET_KEY"] = "test-secret-key-32-bytes-minimum-length-for-security"
 os.environ["JWT_SECRET_KEY"] = "test-jwt-secret-key-32-bytes-minimum-length-security"

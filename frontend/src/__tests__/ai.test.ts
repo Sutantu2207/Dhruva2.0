@@ -12,132 +12,17 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DraftQuestionItem } from '../types/ai';
 import type { QuestionAdmin } from '../types/assessment';
-
-// Regex patterns for client-side pre-flight detection
-const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/gi;
-const PHONE_REGEX = /(?:\+?(\d{1,3}))?[-. (]*(\d{3})[-. )]*(\d{3})[-. ]*(\d{4})(?: *x(\d+))?/g;
-const ROLL_NO_REGEX = /\b(?:[12]\d{3}[A-Z]{2,4}\d{3,5}|ROLL[:\s-]*[A-Z0-9]+)\b/gi;
-const NATIONAL_ID_REGEX = /\b(?:\d{4}[-\s]?\d{4}[-\s]?\d{4}|\d{3}-\d{2}-\d{4})\b/g;
-
-// Adversarial patterns for prompt injection detection
-const INJECTION_PATTERNS: Array<{ pattern: RegExp; threat: string }> = [
-  {
-    pattern: /(?:ignore|disregard|forget)\s+(?:all\s+)?(?:previous|prior|above)\s+instructions/i,
-    threat: 'INSTRUCTION_OVERRIDE',
-  },
-  {
-    pattern: /(?:act as|you are now|pretend to be)\s+(?:DAN|developer mode|unrestricted|godmode)/i,
-    threat: 'JAILBREAK_ATTEMPT',
-  },
-  {
-    pattern: /(?:print|reveal|output|display)\s+(?:your\s+)?(?:system prompt|initial instructions|hidden prompt)/i,
-    threat: 'SYSTEM_PROMPT_EXTRACTION',
-  },
-  {
-    pattern: /(?:retrieve|dump|show)\s+(?:all\s+)?(?:tenants|institutions|database credentials|other students)/i,
-    threat: 'CROSS_TENANT_EXFILTRATION',
-  },
-];
-
-function detectAndSanitizePII(text: string) {
-  const detectedTypes: string[] = [];
-  let redactionCount = 0;
-  let sanitized = text;
-
-  if (EMAIL_REGEX.test(text)) {
-    detectedTypes.push('EMAIL_ADDRESS');
-    sanitized = sanitized.replace(EMAIL_REGEX, () => {
-      redactionCount++;
-      return '[REDACTED_EMAIL]';
-    });
-  }
-
-  if (PHONE_REGEX.test(text)) {
-    detectedTypes.push('PHONE_NUMBER');
-    sanitized = sanitized.replace(PHONE_REGEX, () => {
-      redactionCount++;
-      return '[REDACTED_PHONE]';
-    });
-  }
-
-  if (ROLL_NO_REGEX.test(text)) {
-    detectedTypes.push('STUDENT_ROLL_NUMBER');
-    sanitized = sanitized.replace(ROLL_NO_REGEX, () => {
-      redactionCount++;
-      return '[REDACTED_STUDENT_ID]';
-    });
-  }
-
-  if (NATIONAL_ID_REGEX.test(text)) {
-    detectedTypes.push('NATIONAL_ID');
-    sanitized = sanitized.replace(NATIONAL_ID_REGEX, () => {
-      redactionCount++;
-      return '[REDACTED_NATIONAL_ID]';
-    });
-  }
-
-  return {
-    hasPII: detectedTypes.length > 0,
-    detectedTypes,
-    sanitizedText: sanitized,
-    redactionCount,
-  };
-}
-
-function checkPromptSecurity(prompt: string) {
-  for (const { pattern, threat } of INJECTION_PATTERNS) {
-    if (pattern.test(prompt)) {
-      return {
-        isSafe: false,
-        threatType: threat,
-        reason: `Adversarial pattern identified: ${threat.replace(/_/g, ' ')}. Out of syllabus or injection attempts are blocked by the Dhruva.AI safety gateway.`,
-      };
-    }
-  }
-
-  return { isSafe: true };
-}
-
-function transformDraftToQuestionAdmin(
-  draft: DraftQuestionItem,
-  institutionId: string,
-  questionBankId: string
-): QuestionAdmin {
-  const options = draft.options.map((opt, idx) => ({
-    id: `opt-${idx + 1}`,
-    text: opt.text,
-  }));
-
-  const correctIndex = draft.options.findIndex((opt) => opt.is_correct);
-  const correctOptionId = correctIndex >= 0 ? `opt-${correctIndex + 1}` : 'opt-1';
-
-  return {
-    id: `qb-q-${draft.draft_id}-100`,
-    institution_id: institutionId,
-    question_bank_id: questionBankId,
-    question_type: draft.question_type,
-    prompt_text: draft.question_text,
-    options,
-    answer_key: {
-      correct_option_id: correctOptionId,
-    },
-    points: draft.points || 1.0,
-    difficulty: draft.difficulty,
-    explanation: draft.explanation,
-    concept_id: null,
-    skill_id: null,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-}
-
-function formatCitationBadge(citationId: string, title: string, courseCode: string): string {
-  return `[${citationId}: ${courseCode} • ${title}]`;
-}
+import {
+  detectAndSanitizePII,
+  checkPromptSecurity,
+  transformDraftToQuestionAdmin,
+  formatCitationBadge,
+} from '../lib/ai/guardrails.ts';
 
 // =============================================================================
 // TEST SUITES
 // =============================================================================
+
 
 describe('Guardrailed AI Gateway — Client PII Sanitization', () => {
   it('detects and redacts email addresses from query', () => {

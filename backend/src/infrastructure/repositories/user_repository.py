@@ -10,6 +10,8 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from src.domain.identity.models import RefreshToken, Role, User, UserRole
+from src.domain.identity.permissions import Permission
+from src.domain.identity.roles import SystemRole
 from src.infrastructure.persistence.postgres.base import utc_now
 
 
@@ -22,7 +24,10 @@ class UserRepository:
     async def get_by_id(self, user_id: uuid.UUID) -> Optional[User]:
         stmt = (
             select(User)
-            .options(selectinload(User.user_roles).selectinload(UserRole.role))
+            .options(
+                selectinload(User.institution),
+                selectinload(User.user_roles).selectinload(UserRole.role),
+            )
             .where(User.id == user_id, User.deleted_at.is_(None))
         )
         result = await self.session.execute(stmt)
@@ -31,7 +36,10 @@ class UserRepository:
     async def get_by_email(self, email: str) -> Optional[User]:
         stmt = (
             select(User)
-            .options(selectinload(User.user_roles).selectinload(UserRole.role))
+            .options(
+                selectinload(User.institution),
+                selectinload(User.user_roles).selectinload(UserRole.role),
+            )
             .where(User.email == email.lower().strip(), User.deleted_at.is_(None))
         )
         result = await self.session.execute(stmt)
@@ -123,6 +131,9 @@ class UserRepository:
         user = await self.get_by_id(user_id)
         if not user:
             return set()
+        user_roles = [ur.role.code for ur in user.user_roles if ur.role]
+        if SystemRole.SUPER_ADMIN.value in user_roles:
+            return {p.value for p in Permission}
         permissions: Set[str] = set()
         for ur in user.user_roles:
             if ur.role and ur.role.permissions:

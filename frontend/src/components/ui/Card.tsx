@@ -24,10 +24,11 @@ export const Card: React.FC<CardProps> = ({
         border: '1px solid var(--border-subtle)',
         borderRadius: 'var(--radius-lg)',
         boxShadow: elevation === 'raised' ? 'var(--shadow-md)' : 'var(--shadow-sm)',
-        padding: '20px',
+        padding: '24px',
         display: 'flex',
         flexDirection: 'column',
         gap: '16px',
+        transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
         ...style,
       }}
       {...props}
@@ -36,7 +37,7 @@ export const Card: React.FC<CardProps> = ({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
             {title && (
-              <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
                 {title}
               </h3>
             )}

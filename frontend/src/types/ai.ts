@@ -87,3 +87,37 @@ export interface PromptInjectionCheckResult {
   threatType?: string;
   reason?: string;
 }
+
+export interface AIConversation {
+  id: string;
+  institution_id: string;
+  user_id: string;
+  context_type: string;
+  context_id?: string | null;
+  title: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AIProviderStatus {
+  active_provider: string;
+  active_model: string;
+  status: string;
+  latency_ms: number;
+  configured_providers: {
+    google_gemini: { configured: boolean; model: string };
+    nvidia_ai: { configured: boolean; model: string };
+  };
+}
+
+export interface AIMessageItem {
+  id: string;
+  conversation_id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  model_name?: string;
+  pii_detected_count?: number;
+  latency_ms?: number;
+  created_at: string;
+}

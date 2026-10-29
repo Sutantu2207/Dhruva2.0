@@ -131,3 +131,39 @@ class AIAuditLogResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AIMessageResponse(BaseModel):
+    id: uuid.UUID
+    conversation_id: uuid.UUID
+    sender_role: str
+    raw_content: str
+    sanitized_content: str
+    citations_json: List[Dict[str, Any]] = Field(default_factory=list)
+    model_name: str
+    token_count: int
+    latency_ms: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ProviderConfigItem(BaseModel):
+    configured: bool
+    model: str
+    status: Optional[str] = "UNKNOWN"
+    verdict: Optional[str] = None
+    detail: Optional[str] = None
+    remediation: Optional[str] = None
+
+
+class AIProviderStatusResponse(BaseModel):
+    active_provider: str
+    active_model: str
+    status: str
+    latency_ms: float
+    diagnostic_verdict: Optional[str] = None
+    remediation: Optional[str] = None
+    configured_providers: Dict[str, ProviderConfigItem]
+

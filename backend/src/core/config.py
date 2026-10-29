@@ -6,7 +6,7 @@ Enforces fail-fast validation in staging and production to prevent insecure depl
 
 from enum import Enum
 from functools import lru_cache
-from typing import List, Union
+from typing import List, Optional, Union
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -60,6 +60,48 @@ class Settings(BaseSettings):
     # Rate Limiting
     RATE_LIMIT_LOGIN_PER_MINUTE: int = 5
     RATE_LIMIT_DEFAULT_PER_MINUTE: int = 100
+
+    # AI Gateway & LLM Provider Configuration
+    GEMINI_API_KEY: Optional[str] = Field(
+        default=None,
+        description="Google Gemini API key for production LLM inference",
+    )
+    GEMINI_MODEL: str = Field(
+        default="gemini-1.5-flash",
+        description="Configured Gemini model (e.g. gemini-1.5-flash, gemini-2.0-flash, gemini-1.5-pro)",
+    )
+    GEMINI_API_BASE_URL: str = Field(
+        default="https://generativelanguage.googleapis.com/v1beta",
+        description="Gemini REST API endpoint",
+    )
+    NVIDIA_API_KEY: Optional[str] = Field(
+        default=None,
+        description="NVIDIA AI Foundation API key for alternative LLM inference",
+    )
+    NVIDIA_BASE_URL: str = Field(
+        default="https://integrate.api.nvidia.com/v1",
+        description="NVIDIA AI endpoint",
+    )
+    NVIDIA_MODEL: str = Field(
+        default="nvidia/nemotron-3-ultra-550b-a55b",
+        description="Configured NVIDIA model identifier (e.g. nvidia/nemotron-3-ultra-550b-a55b)",
+    )
+    AI_REQUEST_TIMEOUT_SECONDS: int = Field(
+        default=30,
+        description="Timeout for LLM inference calls",
+    )
+    AI_MAX_RETRIES: int = Field(
+        default=3,
+        description="Maximum retry attempts for transient LLM errors",
+    )
+    AI_MAX_OUTPUT_TOKENS: int = Field(
+        default=2048,
+        description="Maximum tokens generated per response",
+    )
+    AI_TEMPERATURE: float = Field(
+        default=0.4,
+        description="Sampling temperature for grounded academic reasoning",
+    )
 
     # CORS & Cookies
     CORS_ORIGINS: Union[List[str], str] = ["http://localhost:3000", "http://127.0.0.1:3000"]

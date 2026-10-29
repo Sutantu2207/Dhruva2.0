@@ -30,6 +30,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Initializing Dhruva.AI V2 Core Application Engine...")
     yield
     logger.info("Shutting down Dhruva.AI V2 Core Application Engine...")
+    from src.infrastructure.persistence.postgres.database import engine
+    await engine.dispose()
 
 
 app = FastAPI(
@@ -48,6 +50,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],

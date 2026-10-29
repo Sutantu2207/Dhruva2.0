@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { api, ApiError } from '@/lib/api/client';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -19,6 +20,7 @@ import {
 
 export default function AnalyticsInterventionsWorkspace() {
   const { user } = useAuth();
+  const tenantSlug = user?.institution_slug || '';
   const primaryRole = user?.roles[0] || 'STUDENT';
   const isStaff = ['SUPER_ADMIN', 'INSTITUTION_ADMIN', 'HOD', 'FACULTY'].includes(primaryRole);
   const isAdmin = ['SUPER_ADMIN', 'INSTITUTION_ADMIN', 'HOD'].includes(primaryRole);
@@ -31,310 +33,135 @@ export default function AnalyticsInterventionsWorkspace() {
   // Rollups & Health State
   const [isRefreshingRollup, setIsRefreshingRollup] = useState(false);
   const [rollupEvaluatedAt, setRollupEvaluatedAt] = useState<string>(
-    new Date(Date.now() - 1000 * 60 * 45).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   );
 
   // Institutional Analytics Data
   const [analyticsData, setAnalyticsData] = useState<InstitutionalAnalytics>({
-    institution_id: user?.institution_id || 'inst-iit-bombay',
+    institution_id: user?.institution_id || '',
     computed_at: new Date().toISOString(),
-    active_students: 420,
-    at_risk_count: 14,
-    active_interventions: 8,
-    overall_passing_rate: 0.924,
-    average_mastery_index: 0.782,
-    total_assessments_taken: 1250,
-    departments: [
-      {
-        department_id: 'dept-cse',
-        department_name: 'Computer Science & Engineering',
-        department_code: 'CSE',
-        enrolled_students: 140,
-        at_risk_students: 3,
-        active_interventions: 2,
-        average_mastery: 0.84,
-        passing_rate: 0.96,
-        retention_index: 0.88,
-      },
-      {
-        department_id: 'dept-ece',
-        department_name: 'Electronics & Communication',
-        department_code: 'ECE',
-        enrolled_students: 110,
-        at_risk_students: 5,
-        active_interventions: 3,
-        average_mastery: 0.76,
-        passing_rate: 0.91,
-        retention_index: 0.81,
-      },
-      {
-        department_id: 'dept-mech',
-        department_name: 'Mechanical Engineering',
-        department_code: 'MECH',
-        enrolled_students: 95,
-        at_risk_students: 4,
-        active_interventions: 2,
-        average_mastery: 0.73,
-        passing_rate: 0.88,
-        retention_index: 0.77,
-      },
-      {
-        department_id: 'dept-civil',
-        department_name: 'Civil & Infrastructure Engineering',
-        department_code: 'CIVIL',
-        enrolled_students: 75,
-        at_risk_students: 2,
-        active_interventions: 1,
-        average_mastery: 0.79,
-        passing_rate: 0.93,
-        retention_index: 0.84,
-      },
-    ],
+    active_students: 0,
+    at_risk_count: 0,
+    active_interventions: 0,
+    overall_passing_rate: 1.0,
+    average_mastery_index: 0.0,
+    total_assessments_taken: 0,
+    departments: [],
     skill_distribution: {
-      mastery: 165,
-      proficient: 172,
-      developing: 69,
-      novice: 14,
+      mastery: 0,
+      proficient: 0,
+      developing: 0,
+      novice: 0,
     },
     interventions_by_status: {
-      ASSIGNED: 3,
-      IN_PROGRESS: 4,
-      COMPLETED: 18,
-      ESCALATED: 1,
-      DISMISSED: 2,
+      ASSIGNED: 0,
+      IN_PROGRESS: 0,
+      COMPLETED: 0,
+      ESCALATED: 0,
+      DISMISSED: 0,
     },
     interventions_by_type: {
-      ACADEMIC_TUTORING: 4,
-      ATTENDANCE_COUNSELING: 1,
-      MENTOR_CHECKIN: 1,
-      STUDY_PLAN_REVISION: 2,
+      ACADEMIC_TUTORING: 0,
+      ATTENDANCE_COUNSELING: 0,
+      MENTOR_CHECKIN: 0,
+      STUDY_PLAN_REVISION: 0,
       PSYCHOLOGICAL_COUNSELING: 0,
     },
   });
 
   // Early Warning Detection Records
-  const [atRiskCohort, setAtRiskCohort] = useState<AtRiskStudent[]>([
-    {
-      student_id: 'std-101',
-      full_name: 'Anita Rao',
-      email: 'anita.rao@iitb.ac.in',
-      roll_number: '2026-CS-042',
-      risk_level: 'CRITICAL',
-      detected_rules: [
-        {
-          rule_id: 'rule-fail-rate',
-          name: 'Critical Assessment Failure Rate',
-          severity: 'CRITICAL',
-          metric: 'Assessment Fail Rate',
-          actual_value: 0.67,
-          threshold_value: 0.50,
-          description: 'Failed 2 of 3 mid-term assessments. Average score: 32.5%.',
-        },
-        {
-          rule_id: 'rule-decay',
-          name: 'Severe Mastery Decay',
-          severity: 'HIGH',
-          metric: 'Competency Half-Life',
-          actual_value: 0.28,
-          threshold_value: 0.40,
-          description: 'Algorithms (CS-ALG-01) and Data Structures (CS-DS-02) fallen below 30% retention threshold.',
-        },
-      ],
-      recommended_intervention_type: 'ACADEMIC_TUTORING',
-      trigger_reason: 'Combined assessment failure in core modules with acute competency decay.',
-      metrics_summary: {
-        average_mastery: 0.34,
-        assessment_fail_count: 2,
-        decayed_skills_count: 2,
-      },
-    },
-    {
-      student_id: 'std-102',
-      full_name: 'Vikram Mehta',
-      email: 'vikram.mehta@iitb.ac.in',
-      roll_number: '2026-EC-019',
-      risk_level: 'HIGH',
-      detected_rules: [
-        {
-          rule_id: 'rule-decay',
-          name: 'Competency Decay',
-          severity: 'HIGH',
-          metric: 'Decayed Skills',
-          actual_value: 2,
-          threshold_value: 2,
-          description: 'Signals & Systems (EC-SIG-01) and Digital Logic (EC-DL-03) dropped below 40% threshold.',
-        },
-      ],
-      recommended_intervention_type: 'STUDY_PLAN_REVISION',
-      trigger_reason: 'Retention half-life exceeded on foundational prerequisites.',
-      metrics_summary: {
-        average_mastery: 0.42,
-        assessment_fail_count: 1,
-        decayed_skills_count: 2,
-      },
-    },
-    {
-      student_id: 'std-103',
-      full_name: 'Pooja Iyer',
-      email: 'pooja.iyer@iitb.ac.in',
-      roll_number: '2026-ME-058',
-      risk_level: 'MEDIUM',
-      detected_rules: [
-        {
-          rule_id: 'rule-single-fail',
-          name: 'Isolated Assessment Deficit',
-          severity: 'MEDIUM',
-          metric: 'Recent Score',
-          actual_value: 36.0,
-          threshold_value: 40.0,
-          description: 'Thermodynamics Quiz 2 scored 36.0%, below institutional pass mark of 40%.',
-        },
-      ],
-      recommended_intervention_type: 'MENTOR_CHECKIN',
-      trigger_reason: 'Isolated deficiency on thermodynamics concepts.',
-      metrics_summary: {
-        average_mastery: 0.58,
-        assessment_fail_count: 1,
-        decayed_skills_count: 0,
-      },
-    },
-  ]);
+  const [atRiskCohort, setAtRiskCohort] = useState<AtRiskStudent[]>([]);
+  const [isLoadingCohort, setIsLoadingCohort] = useState(false);
 
   // Interventions List
-  const [interventions, setInterventions] = useState<Intervention[]>([
-    {
-      id: 'int-001',
-      institution_id: user?.institution_id || 'inst-iit-bombay',
-      student_user_id: 'std-101',
-      faculty_user_id: 'fac-301',
-      intervention_type: 'ACADEMIC_TUTORING',
-      trigger_reason: 'Failed 2 of 3 mid-term assessments with acute competency decay in Data Structures.',
-      status: 'IN_PROGRESS',
-      action_plan: 'Weekly 1:1 problem solving labs on dynamic programming and graph traversals.',
-      notes: 'Initial consultation completed. Student showed good engagement.',
-      outcome_notes: 'Diagnostic session held. Recommended targeted practice sets 1 through 4.',
-      assigned_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-      due_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString(),
-      completed_at: null,
-      created_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-      updated_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-      student: {
-        id: 'std-101',
-        full_name: 'Anita Rao',
-        email: 'anita.rao@iitb.ac.in',
-        roll_number: '2026-CS-042',
-      },
-      faculty: {
-        id: 'fac-301',
-        full_name: 'Dr. Ramesh Sundaram',
-        email: 'ramesh.s@iitb.ac.in',
-      },
-    },
-    {
-      id: 'int-002',
-      institution_id: user?.institution_id || 'inst-iit-bombay',
-      student_user_id: 'std-102',
-      faculty_user_id: 'fac-302',
-      intervention_type: 'STUDY_PLAN_REVISION',
-      trigger_reason: 'Retention half-life exceeded on foundational signals & systems prerequisites.',
-      status: 'ASSIGNED',
-      action_plan: 'Review syllabus breakdown and re-balance laboratory hours with self-paced revision.',
-      notes: 'Assigned to academic advisor Dr. Priya Patel.',
-      outcome_notes: '',
-      assigned_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-      due_date: new Date(Date.now() + 1000 * 60 * 60 * 24 * 10).toISOString(),
-      completed_at: null,
-      created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-      updated_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-      student: {
-        id: 'std-102',
-        full_name: 'Vikram Mehta',
-        email: 'vikram.mehta@iitb.ac.in',
-        roll_number: '2026-EC-019',
-      },
-      faculty: {
-        id: 'fac-302',
-        full_name: 'Dr. Priya Patel',
-        email: 'priya.patel@iitb.ac.in',
-      },
-    },
-    {
-      id: 'int-003',
-      institution_id: user?.institution_id || 'inst-iit-bombay',
-      student_user_id: 'std-104',
-      faculty_user_id: 'fac-301',
-      intervention_type: 'MENTOR_CHECKIN',
-      trigger_reason: 'Low project activity and delayed milestone submissions.',
-      status: 'COMPLETED',
-      action_plan: 'Milestone recovery plan agreed and verified.',
-      notes: 'Capstone deliverable submitted and approved.',
-      outcome_notes: 'All delayed submissions completed with distinction. Risk normalized.',
-      assigned_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString(),
-      due_date: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-      completed_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-      created_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 14).toISOString(),
-      updated_at: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-      student: {
-        id: 'std-104',
-        full_name: 'Siddharth Nair',
-        email: 'siddharth.n@iitb.ac.in',
-        roll_number: '2026-CS-011',
-      },
-      faculty: {
-        id: 'fac-301',
-        full_name: 'Dr. Ramesh Sundaram',
-        email: 'ramesh.s@iitb.ac.in',
-      },
-    },
-  ]);
+  const [interventions, setInterventions] = useState<Intervention[]>([]);
+  const [isLoadingInterventions, setIsLoadingInterventions] = useState(false);
 
   // Notifications List
-  const [notifications, setNotifications] = useState<NotificationItem[]>([
-    {
-      id: 'notif-1',
-      institution_id: user?.institution_id || 'inst-iit-bombay',
-      recipient_user_id: user?.id || 'usr-me',
-      notification_type: 'EARLY_WARNING',
-      title: 'Academic Alert: Critical Mastery Decay',
-      message: 'Student Anita Rao (CS2026-042) flagged for Database Systems & Algorithms intervention.',
-      is_read: false,
-      link_url: '/workspace/analytics',
-      created_at: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-    },
-    {
-      id: 'notif-2',
-      institution_id: user?.institution_id || 'inst-iit-bombay',
-      recipient_user_id: user?.id || 'usr-me',
-      notification_type: 'INTERVENTION_ASSIGNED',
-      title: 'Intervention Assigned: Academic Tutoring',
-      message: 'You have been assigned to supervise study plan revision for Rahul Sharma.',
-      is_read: false,
-      link_url: '/workspace/analytics',
-      created_at: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-    },
-    {
-      id: 'notif-3',
-      institution_id: user?.institution_id || 'inst-iit-bombay',
-      recipient_user_id: user?.id || 'usr-me',
-      notification_type: 'ANALYTICS_ROLLUP',
-      title: 'Nightly Rollup Generated',
-      message: 'Departmental passing rates and competency health rollups successfully cached.',
-      is_read: false,
-      link_url: '/workspace/analytics',
-      created_at: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
-    },
-    {
-      id: 'notif-4',
-      institution_id: user?.institution_id || 'inst-iit-bombay',
-      recipient_user_id: user?.id || 'usr-me',
-      notification_type: 'INTERVENTION_COMPLETED',
-      title: 'Intervention Resolved',
-      message: 'Milestone recovery plan for Siddharth Nair completed and marked resolved.',
-      is_read: true,
-      read_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-      created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    },
-  ]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(false);
+
+  // Data Fetching Functions
+  const fetchLiveAnalytics = async () => {
+    if (!tenantSlug) return;
+    setIsRefreshingRollup(true);
+    try {
+      const res = await api.get<any>(`/institutions/${tenantSlug}/analytics/institutional`);
+      if (res) {
+        const metrics = res.metrics || res;
+        setAnalyticsData((prev) => ({
+          ...prev,
+          institution_id: res.institution_id || prev.institution_id,
+          computed_at: res.computed_at || prev.computed_at,
+          active_students: metrics.total_students ?? prev.active_students,
+          at_risk_count: metrics.at_risk_students_count ?? prev.at_risk_count,
+          active_interventions: metrics.active_interventions_count ?? prev.active_interventions,
+          overall_passing_rate: metrics.overall_passing_rate ?? prev.overall_passing_rate,
+          average_mastery_index: metrics.average_skill_mastery ?? prev.average_mastery_index,
+          total_assessments_taken: metrics.total_graded_assessments ?? prev.total_assessments_taken,
+        }));
+        setRollupEvaluatedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      }
+    } catch {
+      // Live fallback
+    } finally {
+      setIsRefreshingRollup(false);
+    }
+  };
+
+  const fetchAtRiskCohort = async () => {
+    if (!tenantSlug || !isStaff) return;
+    setIsLoadingCohort(true);
+    try {
+      const res = await api.post<AtRiskStudent[]>(`/institutions/${tenantSlug}/interventions/detect-at-risk`);
+      if (Array.isArray(res)) {
+        setAtRiskCohort(res);
+        setAnalyticsData((prev) => ({ ...prev, at_risk_count: res.length }));
+      }
+    } catch {
+      // Empty fallback
+    } finally {
+      setIsLoadingCohort(false);
+    }
+  };
+
+  const fetchInterventions = async () => {
+    if (!tenantSlug) return;
+    setIsLoadingInterventions(true);
+    try {
+      const res = await api.get<Intervention[]>(`/institutions/${tenantSlug}/interventions`);
+      if (Array.isArray(res)) {
+        setInterventions(res);
+      }
+    } catch {
+      // Empty fallback
+    } finally {
+      setIsLoadingInterventions(false);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    if (!tenantSlug) return;
+    setIsLoadingNotifications(true);
+    try {
+      const res = await api.get<NotificationItem[]>(`/institutions/${tenantSlug}/notifications`);
+      if (Array.isArray(res)) {
+        setNotifications(res);
+      }
+    } catch {
+      // Empty fallback
+    } finally {
+      setIsLoadingNotifications(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!tenantSlug) return;
+    fetchLiveAnalytics();
+    fetchAtRiskCohort();
+    fetchInterventions();
+    fetchNotifications();
+  }, [tenantSlug]);
 
   // Modals & Forms
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -360,20 +187,20 @@ export default function AnalyticsInterventionsWorkspace() {
   const [notificationUnreadOnly, setNotificationUnreadOnly] = useState<boolean>(false);
 
   // Compute & Refresh Rollup Handler
-  const handleComputeRollup = () => {
+  const handleComputeRollup = async () => {
+    if (!tenantSlug) return;
     setIsRefreshingRollup(true);
-    setTimeout(() => {
+    try {
+      await api.post(`/institutions/${tenantSlug}/analytics/compute-rollups`, {});
+      await fetchLiveAnalytics();
+      await fetchAtRiskCohort();
+      await fetchInterventions();
+    } catch {
+      // Refresh local timestamp
       setRollupEvaluatedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      setAnalyticsData((prev) => ({
-        ...prev,
-        computed_at: new Date().toISOString(),
-        overall_passing_rate: 0.928,
-        average_mastery_index: 0.789,
-        at_risk_count: atRiskCohort.length,
-        active_interventions: interventions.filter((i) => ['ASSIGNED', 'IN_PROGRESS', 'ESCALATED'].includes(i.status)).length,
-      }));
+    } finally {
       setIsRefreshingRollup(false);
-    }, 600);
+    }
   };
 
   // Open Assign Modal
@@ -389,57 +216,30 @@ export default function AnalyticsInterventionsWorkspace() {
   };
 
   // Submit Assign Modal
-  const handleCreateIntervention = (e: React.FormEvent) => {
+  const handleCreateIntervention = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedStudentForAssign) return;
+    if (!selectedStudentForAssign || !tenantSlug) return;
 
-    const newIntervention: Intervention = {
-      id: `int-${Date.now()}`,
-      institution_id: user?.institution_id || 'inst-iit-bombay',
-      student_user_id: selectedStudentForAssign.student_id,
-      faculty_user_id: user?.id || 'fac-me',
-      intervention_type: assignForm.intervention_type,
-      trigger_reason: selectedStudentForAssign.trigger_reason,
-      status: 'ASSIGNED',
-      action_plan: assignForm.action_plan,
-      notes: assignForm.notes,
-      outcome_notes: '',
-      assigned_at: new Date().toISOString(),
-      due_date: new Date(Date.now() + parseInt(assignForm.due_days) * 24 * 60 * 60 * 1000).toISOString(),
-      completed_at: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      student: {
-        id: selectedStudentForAssign.student_id,
-        full_name: selectedStudentForAssign.full_name,
-        email: selectedStudentForAssign.email,
-        roll_number: selectedStudentForAssign.roll_number,
-      },
-      faculty: {
-        id: user?.id || 'fac-me',
-        full_name: user?.full_name || 'Faculty Mentor',
-        email: user?.email || 'mentor@institution.edu',
-      },
-    };
+    try {
+      const created = await api.post<Intervention>(`/institutions/${tenantSlug}/interventions`, {
+        student_user_id: selectedStudentForAssign.student_id,
+        intervention_type: assignForm.intervention_type,
+        trigger_reason: selectedStudentForAssign.trigger_reason,
+        action_plan: assignForm.action_plan,
+        notes: assignForm.notes,
+        due_date: new Date(Date.now() + parseInt(assignForm.due_days) * 24 * 60 * 60 * 1000).toISOString(),
+      });
 
-    setInterventions([newIntervention, ...interventions]);
-
-    // Dispatch a local notification
-    const newNotif: NotificationItem = {
-      id: `notif-${Date.now()}`,
-      institution_id: user?.institution_id || 'inst-iit-bombay',
-      recipient_user_id: selectedStudentForAssign.student_id,
-      actor_user_id: user?.id,
-      notification_type: 'INTERVENTION_ASSIGNED',
-      title: `Intervention Assigned: ${assignForm.intervention_type.replace(/_/g, ' ')}`,
-      message: `Faculty mentor assigned action plan: "${assignForm.action_plan}"`,
-      is_read: false,
-      created_at: new Date().toISOString(),
-    };
-    setNotifications([newNotif, ...notifications]);
-
-    setIsAssignModalOpen(false);
-    setSelectedStudentForAssign(null);
+      if (created) {
+        setInterventions((prev) => [created, ...prev.filter((i) => i.id !== created.id)]);
+      }
+      await fetchNotifications();
+      setIsAssignModalOpen(false);
+      setSelectedStudentForAssign(null);
+    } catch (err: unknown) {
+      const errorMsg = err instanceof ApiError ? err.message : 'Could not create intervention';
+      alert(`Notice: ${errorMsg}`);
+    }
   };
 
   // Open Update Modal
@@ -454,29 +254,31 @@ export default function AnalyticsInterventionsWorkspace() {
   };
 
   // Submit Update Modal
-  const handleUpdateIntervention = (e: React.FormEvent) => {
+  const handleUpdateIntervention = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedInterventionForUpdate) return;
+    if (!selectedInterventionForUpdate || !tenantSlug) return;
 
-    setInterventions((prev) =>
-      prev.map((i) => {
-        if (i.id === selectedInterventionForUpdate.id) {
-          const isDone = updateForm.status === 'COMPLETED';
-          return {
-            ...i,
-            status: updateForm.status,
-            outcome_notes: updateForm.outcome_notes,
-            action_plan: updateForm.action_plan,
-            completed_at: isDone ? new Date().toISOString() : i.completed_at,
-            updated_at: new Date().toISOString(),
-          };
+    try {
+      const updated = await api.patch<Intervention>(
+        `/institutions/${tenantSlug}/interventions/${selectedInterventionForUpdate.id}`,
+        {
+          status: updateForm.status,
+          outcome_notes: updateForm.outcome_notes,
+          action_plan: updateForm.action_plan,
         }
-        return i;
-      })
-    );
+      );
 
-    setIsUpdateModalOpen(false);
-    setSelectedInterventionForUpdate(null);
+      if (updated) {
+        setInterventions((prev) =>
+          prev.map((i) => (i.id === updated.id ? updated : i))
+        );
+      }
+      setIsUpdateModalOpen(false);
+      setSelectedInterventionForUpdate(null);
+    } catch (err: unknown) {
+      const errorMsg = err instanceof ApiError ? err.message : 'Could not update status';
+      alert(`Notice: ${errorMsg}`);
+    }
   };
 
   // Filtered Cohort
@@ -506,13 +308,27 @@ export default function AnalyticsInterventionsWorkspace() {
     return notifications;
   }, [notifications, notificationUnreadOnly]);
 
-  const markNotifRead = (id: string) => {
+  const markNotifRead = async (id: string) => {
+    if (tenantSlug) {
+      try {
+        await api.post(`/institutions/${tenantSlug}/notifications/${id}/read`, {});
+      } catch {
+        // Fallback
+      }
+    }
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n))
     );
   };
 
-  const markAllNotifsRead = () => {
+  const markAllNotifsRead = async () => {
+    if (tenantSlug) {
+      try {
+        await api.post(`/institutions/${tenantSlug}/notifications/mark-all-read`, {});
+      } catch {
+        // Fallback
+      }
+    }
     setNotifications((prev) =>
       prev.map((n) => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
     );

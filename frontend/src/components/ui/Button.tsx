@@ -21,25 +21,32 @@ export const Button: React.FC<ButtonProps> = ({
         return {
           backgroundColor: 'var(--brand-primary)',
           color: '#ffffff',
+          fontWeight: 600,
           border: '1px solid transparent',
+          boxShadow: 'var(--shadow-sm)',
         };
       case 'secondary':
         return {
-          backgroundColor: 'var(--bg-surface-elevated)',
+          backgroundColor: 'var(--bg-surface-subtle)',
           color: 'var(--text-primary)',
-          border: '1px solid var(--border-default)',
+          fontWeight: 500,
+          border: '1px solid var(--border-subtle)',
         };
       case 'outline':
         return {
-          backgroundColor: 'transparent',
+          backgroundColor: 'var(--bg-surface)',
           color: 'var(--text-primary)',
+          fontWeight: 500,
           border: '1px solid var(--border-default)',
+          boxShadow: 'var(--shadow-sm)',
         };
       case 'danger':
         return {
           backgroundColor: 'var(--status-danger)',
           color: '#ffffff',
+          fontWeight: 600,
           border: '1px solid transparent',
+          boxShadow: 'var(--shadow-sm)',
         };
       case 'ghost':
         return {
@@ -55,7 +62,7 @@ export const Button: React.FC<ButtonProps> = ({
       case 'sm':
         return { padding: '6px 12px', fontSize: '12px' };
       case 'md':
-        return { padding: '8px 16px', fontSize: '14px' };
+        return { padding: '9px 18px', fontSize: '14px' };
       case 'lg':
         return { padding: '12px 24px', fontSize: '15px' };
     }
@@ -71,12 +78,10 @@ export const Button: React.FC<ButtonProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         gap: '8px',
-        fontWeight: 500,
         borderRadius: 'var(--radius-md)',
         cursor: disabled || isLoading ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.6 : 1,
         transition: 'all 0.15s ease',
-        boxShadow: variant === 'primary' ? 'var(--shadow-sm)' : undefined,
         ...getVariantStyles(),
         ...getSizeStyles(),
         ...style,
@@ -91,7 +96,7 @@ export const Button: React.FC<ButtonProps> = ({
               display: 'inline-block',
               width: '14px',
               height: '14px',
-              border: '2px solid rgba(255,255,255,0.3)',
+              border: '2px solid rgba(255, 255, 255, 0.3)',
               borderRadius: '50%',
               borderTopColor: '#ffffff',
               animation: 'spin 0.6s linear infinite',

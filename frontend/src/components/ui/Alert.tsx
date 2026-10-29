@@ -15,27 +15,27 @@ export const Alert: React.FC<AlertProps> = ({
     switch (variant) {
       case 'info':
         return {
-          bg: 'var(--status-info-subtle)',
-          border: 'rgba(59, 130, 246, 0.25)',
-          color: 'var(--status-info)',
+          bg: '#ede4ff',
+          border: 'rgba(124, 58, 237, 0.25)',
+          color: '#7c3aed',
         };
       case 'success':
         return {
-          bg: 'var(--status-success-subtle)',
+          bg: '#ecfdf5',
           border: 'rgba(16, 185, 129, 0.25)',
-          color: 'var(--status-success)',
+          color: '#059669',
         };
       case 'warning':
         return {
-          bg: 'var(--status-warning-subtle)',
+          bg: '#fffbeb',
           border: 'rgba(245, 158, 11, 0.25)',
-          color: 'var(--status-warning)',
+          color: '#d97706',
         };
       case 'danger':
         return {
-          bg: 'var(--status-danger-subtle)',
+          bg: '#fef2f2',
           border: 'rgba(239, 68, 68, 0.25)',
-          color: 'var(--status-danger)',
+          color: '#dc2626',
         };
     }
   };

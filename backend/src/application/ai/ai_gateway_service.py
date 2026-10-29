@@ -4,7 +4,8 @@ Coordinates:
 - Security checks & Prompt Injection screening
 - PII Sanitization & Zero data leakage
 - Tenant-isolated Context Building & Provenance citations
-- LLM inference & Structured output validation
+- Multi-turn conversation memory retrieval & context window management
+- LLM inference across Gemini / NVIDIA / Deterministic providers
 - Immutable Audit Logging
 """
 
@@ -17,7 +18,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from src.application.ai.context_builder import ContextBuilder
-from src.application.ai.model_adapter import BaseLLMAdapter, DeterministicGroundedProvider
+from src.application.ai.model_adapter import (
+    BaseLLMAdapter,
+    ChatMessage,
+    get_ai_provider_status,
+    get_llm_adapter,
+)
 from src.application.ai.pii_sanitizer import PIISanitizer
 from src.application.ai.prompt_guard import PromptGuard
 from src.core.errors import NotFoundError, PermissionDeniedError, ValidationError
@@ -32,7 +38,7 @@ class AIGatewayService:
     def __init__(self, session: AsyncSession, model_adapter: Optional[BaseLLMAdapter] = None):
         self.session = session
         self.context_builder = ContextBuilder(session)
-        self.model_adapter = model_adapter or DeterministicGroundedProvider()
+        self.model_adapter = model_adapter or get_llm_adapter()
 
     @staticmethod
     def _hash_prompt(prompt: str) -> str:
@@ -46,13 +52,12 @@ class AIGatewayService:
         user_message: str,
         conversation_id: Optional[uuid.UUID] = None,
     ) -> Dict[str, Any]:
-        """Executes student grounded AI tutoring workflow with multi-layered guardrails."""
+        """Executes student grounded AI tutoring workflow with multi-layered guardrails and multi-turn memory."""
         prompt_hash = self._hash_prompt(user_message)
 
         # 1. Prompt Injection Defense
         guard_result = PromptGuard.evaluate(user_message)
         if guard_result.verdict == "BLOCKED":
-            # Log security block in audit trail
             audit = AIAuditLog(
                 institution_id=institution_id,
                 user_id=user.id,
@@ -74,25 +79,10 @@ class AIGatewayService:
             user_names=[user.first_name, user.last_name, user.full_name],
         )
 
-        # 3. Tenant-Isolated Context Assembly
-        grounded_context = await self.context_builder.build_course_context(
-            institution_id=institution_id,
-            course_id=course_id,
-            user_query=sanitization.sanitized_text,
-        )
+        # 3. Conversation Resolution & Multi-Turn History Retrieval
+        conversation: Optional[AIConversation] = None
+        conversation_history: List[ChatMessage] = []
 
-        # 4. Model Inference
-        llm_response = await self.model_adapter.generate_tutor_response(
-            sanitized_prompt=sanitization.sanitized_text,
-            course_name=grounded_context.course_name,
-            course_code=grounded_context.course_code,
-            context_text=grounded_context.assembled_context,
-            citations=grounded_context.citations,
-            is_out_of_syllabus=grounded_context.is_out_of_syllabus,
-        )
-
-        # 5. Conversation & Message Persistence
-        conversation = None
         if conversation_id:
             conv_stmt = select(AIConversation).where(
                 and_(
@@ -102,10 +92,39 @@ class AIGatewayService:
                 )
             )
             conversation = (await self.session.execute(conv_stmt)).scalar_one_or_none()
+            if not conversation:
+                # Check cross-tenant leakage attempt
+                cross_stmt = select(AIConversation).where(AIConversation.id == conversation_id)
+                cross_conv = (await self.session.execute(cross_stmt)).scalar_one_or_none()
+                if cross_conv:
+                    raise PermissionDeniedError("Cross-tenant conversation access is strictly prohibited.")
+                raise NotFoundError(f"Conversation {conversation_id} not found.")
 
+            # Load recent chronological messages for multi-turn conversational context
+            msg_stmt = (
+                select(AIMessage)
+                .where(AIMessage.conversation_id == conversation.id)
+                .order_by(AIMessage.created_at.asc())
+            )
+            prev_messages = list((await self.session.execute(msg_stmt)).scalars().all())
+
+            # Convert to ChatMessage format (window to last 10 messages to avoid token blowup)
+            for m in prev_messages[-10:]:
+                role = "user" if m.sender_role.upper() == "USER" else "model"
+                conversation_history.append(ChatMessage(role=role, content=m.sanitized_content))
+
+        # 4. Tenant-Isolated Context Assembly
+        grounded_context = await self.context_builder.build_course_context(
+            institution_id=institution_id,
+            course_id=course_id,
+            user_query=sanitization.sanitized_text,
+        )
+
+        # 5. If conversation does not exist yet, create it now
         if not conversation:
-            # Create new conversation
             title_summary = " ".join(user_message.split()[:5])
+            if len(title_summary) > 40:
+                title_summary = title_summary[:40] + "..."
             conversation = AIConversation(
                 institution_id=institution_id,
                 user_id=user.id,
@@ -117,7 +136,19 @@ class AIGatewayService:
             self.session.add(conversation)
             await self.session.flush()
 
-        # Add user message
+        # 6. Model Inference with History & Grounding
+        llm_response = await self.model_adapter.generate_tutor_response(
+            sanitized_prompt=sanitization.sanitized_text,
+            course_name=grounded_context.course_name,
+            course_code=grounded_context.course_code,
+            context_text=grounded_context.assembled_context,
+            citations=grounded_context.citations,
+            conversation_history=conversation_history,
+            user_role="STUDENT",
+            is_out_of_syllabus=grounded_context.is_out_of_syllabus,
+        )
+
+        # 7. Add user message
         user_msg_entry = AIMessage(
             institution_id=institution_id,
             conversation_id=conversation.id,
@@ -131,7 +162,7 @@ class AIGatewayService:
         )
         self.session.add(user_msg_entry)
 
-        # Add assistant message
+        # 8. Add assistant message
         assistant_msg_entry = AIMessage(
             institution_id=institution_id,
             conversation_id=conversation.id,
@@ -145,7 +176,10 @@ class AIGatewayService:
         )
         self.session.add(assistant_msg_entry)
 
-        # 6. Immutable Audit Log
+        # Update conversation timestamp
+        conversation.updated_at = utc_now()
+
+        # 9. Immutable Audit Log
         cost_est = (llm_response.token_count / 1000) * 0.002
         audit = AIAuditLog(
             institution_id=institution_id,
@@ -158,9 +192,10 @@ class AIGatewayService:
             cost_estimate=cost_est,
             metadata_json={
                 "course_code": grounded_context.course_code,
-                "citations_count": len(llm_response.citations),
+                "model_name": llm_response.model_name,
                 "is_refusal": llm_response.is_refusal,
-                "latency_ms": llm_response.latency_ms,
+                "conversation_id": str(conversation.id),
+                "history_turns_count": len(conversation_history),
             },
         )
         self.session.add(audit)
@@ -190,15 +225,13 @@ class AIGatewayService:
         difficulty: str = "MEDIUM",
         num_questions: int = 3,
     ) -> Dict[str, Any]:
-        """Generates grounded assessment questions for faculty with 1-click bank readiness."""
-        # 1. Fetch Course with tenant isolation
+        """Assists faculty in generating high-quality exam questions mapped to Bloom taxonomy."""
         grounded_context = await self.context_builder.build_course_context(
             institution_id=institution_id,
             course_id=course_id,
             user_query=topic_or_concept,
         )
 
-        # 2. Generate Drafts
         drafts = await self.model_adapter.generate_question_drafts(
             course_name=grounded_context.course_name,
             course_code=grounded_context.course_code,
@@ -208,7 +241,6 @@ class AIGatewayService:
             context_text=grounded_context.assembled_context,
         )
 
-        # 3. Log Audit Entry
         audit = AIAuditLog(
             institution_id=institution_id,
             user_id=user.id,
@@ -244,14 +276,12 @@ class AIGatewayService:
         feedback_submissions: List[str],
     ) -> Dict[str, Any]:
         """Summarizes student feedback while strictly sanitizing all student PII."""
-        # 1. Fetch Course with tenant isolation
         grounded_context = await self.context_builder.build_course_context(
             institution_id=institution_id,
             course_id=course_id,
             user_query="feedback analysis",
         )
 
-        # 2. Sanitize PII from all feedback items
         sanitized_feedback: List[str] = []
         total_pii_sanitized = 0
         for fb in feedback_submissions:
@@ -259,13 +289,11 @@ class AIGatewayService:
             sanitized_feedback.append(res.sanitized_text)
             total_pii_sanitized += res.pii_detected_count
 
-        # 3. Summarize
         summary_res = await self.model_adapter.summarize_feedback(
             course_name=grounded_context.course_name,
             feedback_items=sanitized_feedback,
         )
 
-        # 4. Audit Log
         audit = AIAuditLog(
             institution_id=institution_id,
             user_id=user.id,
@@ -313,6 +341,58 @@ class AIGatewayService:
         )
         return list((await self.session.execute(stmt)).scalars().all())
 
+    async def get_conversation_messages(
+        self,
+        institution_id: uuid.UUID,
+        user_id: uuid.UUID,
+        conversation_id: uuid.UUID,
+    ) -> List[AIMessage]:
+        """Retrieves chronological messages for an authenticated user's conversation."""
+        conv_stmt = select(AIConversation).where(
+            and_(
+                AIConversation.id == conversation_id,
+                AIConversation.institution_id == institution_id,
+                AIConversation.user_id == user_id,
+            )
+        )
+        conversation = (await self.session.execute(conv_stmt)).scalar_one_or_none()
+        if not conversation:
+            # Check if exists in another tenant
+            cross_stmt = select(AIConversation).where(AIConversation.id == conversation_id)
+            cross_conv = (await self.session.execute(cross_stmt)).scalar_one_or_none()
+            if cross_conv:
+                raise PermissionDeniedError("Cross-tenant conversation access is strictly prohibited.")
+            raise NotFoundError(f"Conversation {conversation_id} not found.")
+
+        msg_stmt = (
+            select(AIMessage)
+            .where(AIMessage.conversation_id == conversation_id)
+            .order_by(AIMessage.created_at.asc())
+        )
+        return list((await self.session.execute(msg_stmt)).scalars().all())
+
+    async def delete_conversation(
+        self,
+        institution_id: uuid.UUID,
+        user_id: uuid.UUID,
+        conversation_id: uuid.UUID,
+    ) -> bool:
+        """Deletes a conversation session and all its messages."""
+        conv_stmt = select(AIConversation).where(
+            and_(
+                AIConversation.id == conversation_id,
+                AIConversation.institution_id == institution_id,
+                AIConversation.user_id == user_id,
+            )
+        )
+        conversation = (await self.session.execute(conv_stmt)).scalar_one_or_none()
+        if not conversation:
+            raise NotFoundError(f"Conversation {conversation_id} not found.")
+
+        await self.session.delete(conversation)
+        await self.session.commit()
+        return True
+
     async def list_audit_logs(
         self,
         institution_id: uuid.UUID,
@@ -328,3 +408,7 @@ class AIGatewayService:
             .offset(offset)
         )
         return list((await self.session.execute(stmt)).scalars().all())
+
+    async def get_provider_diagnostics(self) -> Dict[str, Any]:
+        """Returns safe provider health and configuration diagnostics without revealing secrets."""
+        return await get_ai_provider_status()

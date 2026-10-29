@@ -23,6 +23,12 @@ class InMemoryRateLimiter:
         cutoff_time = current_time - window_seconds
 
         with self._lock:
+            # Periodic cleanup if dictionary exceeds 5,000 tracked keys to prevent memory leaks
+            if len(self._requests) > 5000:
+                expired_keys = [k for k, v in self._requests.items() if not v or v[-1] <= cutoff_time]
+                for k in expired_keys:
+                    del self._requests[k]
+
             # Filter timestamps outside the sliding window
             timestamps = [ts for ts in self._requests[key] if ts > cutoff_time]
             if len(timestamps) >= max_requests:

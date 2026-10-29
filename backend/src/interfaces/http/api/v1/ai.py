@@ -27,6 +27,8 @@ from src.interfaces.http.dependencies import (
 from src.interfaces.http.schemas.ai import (
     AIAuditLogResponse,
     AIConversationResponse,
+    AIMessageResponse,
+    AIProviderStatusResponse,
     FeedbackSummaryRequest,
     FeedbackSummaryResponse,
     QuestionDraftRequest,
@@ -156,6 +158,77 @@ async def list_conversations(
         request=request,
         pagination=PaginationMeta(total=len(conversations), page=1, page_size=limit),
     )
+
+
+@router.get(
+    "/conversations/{conversation_id}/messages",
+    response_model=ApiResponse[List[AIMessageResponse]],
+    summary="Get Conversation Chronological Messages",
+)
+async def get_conversation_messages(
+    request: Request,
+    conversation_id: uuid.UUID,
+    tenant: Institution = Depends(get_current_tenant),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> ApiResponse[List[AIMessageResponse]]:
+    """Retrieves full conversation history with citations and model telemetry for the active session."""
+    ai_service = AIGatewayService(db)
+    messages = await ai_service.get_conversation_messages(
+        institution_id=tenant.id,
+        user_id=user.id,
+        conversation_id=conversation_id,
+    )
+    return build_response(
+        data=[AIMessageResponse.model_validate(m) for m in messages],
+        request=request,
+    )
+
+
+@router.delete(
+    "/conversations/{conversation_id}",
+    response_model=ApiResponse[Dict[str, Any]],
+    summary="Delete User AI Conversation Session",
+)
+async def delete_conversation(
+    request: Request,
+    conversation_id: uuid.UUID,
+    tenant: Institution = Depends(get_current_tenant),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> ApiResponse[Dict[str, Any]]:
+    """Deletes an active conversation and cascades deletion to all session messages."""
+    ai_service = AIGatewayService(db)
+    await ai_service.delete_conversation(
+        institution_id=tenant.id,
+        user_id=user.id,
+        conversation_id=conversation_id,
+    )
+    return build_response(
+        data={"status": "DELETED", "conversation_id": str(conversation_id)},
+        request=request,
+    )
+
+
+@router.get(
+    "/provider-status",
+    response_model=ApiResponse[AIProviderStatusResponse],
+    summary="Inspect Active AI Provider Health & Readiness",
+)
+async def get_provider_status(
+    request: Request,
+    tenant: Institution = Depends(get_current_tenant),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> ApiResponse[AIProviderStatusResponse]:
+    """Diagnostic health check verifying provider connectivity without exposing credentials."""
+    ai_service = AIGatewayService(db)
+    diagnostics = await ai_service.get_provider_diagnostics()
+    return build_response(
+        data=AIProviderStatusResponse.model_validate(diagnostics),
+        request=request,
+    )
+
 
 
 @router.get(

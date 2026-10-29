@@ -25,20 +25,7 @@ class SystemRole(str, Enum):
 
 # Default permission matrix mapping based on Master Architecture Section 8.2
 DEFAULT_ROLE_PERMISSIONS: Dict[SystemRole, Set[Permission]] = {
-    SystemRole.SUPER_ADMIN: {
-        Permission.PLATFORM_MANAGE,
-        Permission.PLATFORM_HEALTH_READ,
-        Permission.INSTITUTION_SETTINGS_READ,
-        Permission.INSTITUTION_SETTINGS_UPDATE,
-        Permission.INSTITUTION_ROLES_MANAGE,
-        Permission.INSTITUTION_USERS_MANAGE,
-        Permission.DATA_CENTER_READ,
-        Permission.DATA_CENTER_STAGE,
-        Permission.DATA_CENTER_APPROVE,
-        Permission.DATA_CENTER_PUBLISH,
-        Permission.CURRICULUM_READ,
-        Permission.AUDIT_READ_GLOBAL,
-    },
+    SystemRole.SUPER_ADMIN: set(Permission),  # Platform Owner: Full unrestricted access across all platform capabilities
     SystemRole.INSTITUTION_ADMIN: {
         Permission.INSTITUTION_SETTINGS_READ,
         Permission.INSTITUTION_SETTINGS_UPDATE,
