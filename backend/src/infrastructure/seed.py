@@ -133,7 +133,7 @@ async def seed_all_data(session: AsyncSession) -> dict:
         await session.flush()
 
     # 3. Core Personas
-    logger.info("Seeding users and role mappings...")
+    logger.info("Seeding users and role mappings with FULL ACCESS for all personas...")
     hashed_pwd = hash_password(DEFAULT_SEED_PASSWORD)
 
     users_spec = [
@@ -141,56 +141,53 @@ async def seed_all_data(session: AsyncSession) -> dict:
             "email": "superadmin@dhruva.ai",
             "first_name": "Super",
             "last_name": "Administrator",
-            "role": SystemRole.SUPER_ADMIN.value,
-            "inst_id": None,
+            "inst_id": inst.id,
         },
         {
             "email": "admin@iitb.ac.in",
             "first_name": "Rajesh",
             "last_name": "Sharma",
-            "role": SystemRole.INSTITUTION_ADMIN.value,
             "inst_id": inst.id,
         },
         {
             "email": "hod.cse@iitb.ac.in",
             "first_name": "Anita",
             "last_name": "Desai",
-            "role": SystemRole.HOD.value,
             "inst_id": inst.id,
         },
         {
             "email": "prof.verma@iitb.ac.in",
             "first_name": "Vikram",
             "last_name": "Verma",
-            "role": SystemRole.FACULTY.value,
             "inst_id": inst.id,
         },
         {
             "email": "rahul.k@iitb.ac.in",
             "first_name": "Rahul",
             "last_name": "Kumar",
-            "role": SystemRole.STUDENT.value,
             "inst_id": inst.id,
         },
         {
             "email": "placement@iitb.ac.in",
             "first_name": "Sneha",
             "last_name": "Kapoor",
-            "role": SystemRole.PLACEMENT_OFFICER.value,
+            "inst_id": inst.id,
+        },
+        {
+            "email": "sutantu07@gmail.com",
+            "first_name": "Sutantu",
+            "last_name": "Admin",
             "inst_id": inst.id,
         },
     ]
 
+    all_roles = list(role_map.values())
     user_map = {}
+
     for spec in users_spec:
         u_stmt = select(User).where(User.email == spec["email"])
         user = (await session.execute(u_stmt)).scalar_one_or_none()
         if not user:
-            ur = UserRole(
-                id=uuid.uuid4(),
-                role=role_map[spec["role"]],
-                institution_id=spec["inst_id"],
-            )
             user = User(
                 id=uuid.uuid4(),
                 institution_id=spec["inst_id"],
@@ -199,11 +196,57 @@ async def seed_all_data(session: AsyncSession) -> dict:
                 first_name=spec["first_name"],
                 last_name=spec["last_name"],
                 status="ACTIVE",
-                user_roles=[ur],
             )
             session.add(user)
             await session.flush()
+        else:
+            user.institution_id = spec["inst_id"]
+            user.password_hash = hashed_pwd
+            user.status = "ACTIVE"
+            await session.flush()
+
+        # Grant EVERY system role to the user so they have 100% full access across all platform modules
+        for role_obj in all_roles:
+            ur_stmt = select(UserRole).where(
+                UserRole.user_id == user.id,
+                UserRole.role_id == role_obj.id,
+            )
+            existing_ur = (await session.execute(ur_stmt)).scalar_one_or_none()
+            if not existing_ur:
+                ur = UserRole(
+                    id=uuid.uuid4(),
+                    user_id=user.id,
+                    role_id=role_obj.id,
+                    institution_id=spec["inst_id"],
+                )
+                session.add(ur)
+
         user_map[spec["email"]] = user
+
+    await session.flush()
+
+    # Ensure ALL other existing users in the database receive tenant link and all roles
+    all_users_stmt = select(User)
+    all_db_users = (await session.execute(all_users_stmt)).scalars().all()
+    for existing_user in all_db_users:
+        if not existing_user.institution_id:
+            existing_user.institution_id = inst.id
+        for role_obj in all_roles:
+            ur_check = select(UserRole).where(
+                UserRole.user_id == existing_user.id,
+                UserRole.role_id == role_obj.id,
+            )
+            if not (await session.execute(ur_check)).scalar_one_or_none():
+                session.add(
+                    UserRole(
+                        id=uuid.uuid4(),
+                        user_id=existing_user.id,
+                        role_id=role_obj.id,
+                        institution_id=inst.id,
+                    )
+                )
+
+    await session.flush()
 
     # 4. Academic Department & Program
     logger.info("Seeding academic hierarchy...")
@@ -589,18 +632,13 @@ async def seed_all_data(session: AsyncSession) -> dict:
 
 
 async def auto_initialize_and_seed() -> None:
-    """Safe startup hook verifying schema and seeding if no users exist."""
+    """Safe startup hook verifying schema and ensuring foundational seed data & permissions."""
     from src.infrastructure.persistence.postgres.database import engine, AsyncSessionFactory
 
     try:
         await init_schema(engine)
         async with AsyncSessionFactory() as session:
-            count_res = await session.execute(select(User.id).limit(1))
-            user_exists = count_res.scalar_one_or_none() is not None
-            if not user_exists:
-                logger.info("Fresh database detected. Initializing foundational seed data...")
-                await seed_all_data(session)
-            else:
-                logger.info("Existing database verified. Skipping initial seed.")
+            logger.info("Verifying and syncing foundational seed data & full permissions...")
+            await seed_all_data(session)
     except Exception as e:
         logger.error(f"Auto-initialize and seed encountered error: {e}", exc_info=True)

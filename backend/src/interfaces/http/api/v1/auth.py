@@ -11,11 +11,12 @@ Implements:
 
 from typing import List, Optional
 from fastapi import APIRouter, Cookie, Depends, Header, Request, Response, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.application.identity.auth_service import AuthService
 from src.core.config import get_settings
 from src.core.errors import AuthenticationError
-from src.domain.identity.models import User
+from src.domain.identity.models import Institution, User
 from src.domain.identity.roles import get_permissions_for_role
 from src.infrastructure.persistence.postgres.database import get_db_session
 from src.infrastructure.repositories.institution_repository import InstitutionRepository
@@ -67,6 +68,22 @@ def _clear_auth_cookies(response: Response) -> None:
     """Clear authentication cookies on logout."""
     response.delete_cookie(key="access_token", path="/")
     response.delete_cookie(key="refresh_token", path="/")
+
+
+async def _resolve_institution_slug(user: User, session: AsyncSession) -> Optional[str]:
+    """Ensure the user always receives a valid institution slug for client routing."""
+    if user.institution and user.institution.slug:
+        return user.institution.slug
+    if user.institution_id:
+        inst = await session.get(Institution, user.institution_id)
+        if inst and inst.slug:
+            return inst.slug
+    # Fallback to the primary active tenant
+    stmt = select(Institution).where(Institution.status == "ACTIVE").limit(1)
+    primary_inst = (await session.execute(stmt)).scalar_one_or_none()
+    if primary_inst and primary_inst.slug:
+        return primary_inst.slug
+    return "iit-bombay"
 
 
 @router.get(
@@ -140,10 +157,11 @@ async def register(
     roles = [ur.role.code for ur in created_user.user_roles if ur.role]
     perms = list(get_permissions_for_role(payload.role))
 
+    inst_slug = await _resolve_institution_slug(created_user, session)
     user_dto = UserResponse(
         id=created_user.id,
         institution_id=created_user.institution_id,
-        institution_slug=inst.slug if inst else None,
+        institution_slug=inst_slug,
         email=created_user.email,
         first_name=created_user.first_name,
         last_name=created_user.last_name,
@@ -196,10 +214,12 @@ async def login(
     perms = await repo.get_user_permissions(user.id)
     roles = [ur.role.code for ur in user.user_roles if ur.role]
 
+    inst_slug = await _resolve_institution_slug(user, session)
+
     user_dto = UserResponse(
         id=user.id,
         institution_id=user.institution_id,
-        institution_slug=user.institution.slug if user.institution else None,
+        institution_slug=inst_slug,
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,
@@ -256,10 +276,12 @@ async def refresh_token(
     perms = await repo.get_user_permissions(user.id)
     roles = [ur.role.code for ur in user.user_roles if ur.role]
 
+    inst_slug = await _resolve_institution_slug(user, session)
+
     user_dto = UserResponse(
         id=user.id,
         institution_id=user.institution_id,
-        institution_slug=user.institution.slug if user.institution else None,
+        institution_slug=inst_slug,
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,
@@ -324,10 +346,12 @@ async def get_me(
     perms = await repo.get_user_permissions(user.id)
     roles = [ur.role.code for ur in user.user_roles if ur.role]
 
+    inst_slug = await _resolve_institution_slug(user, session)
+
     user_dto = UserResponse(
         id=user.id,
         institution_id=user.institution_id,
-        institution_slug=user.institution.slug if user.institution else None,
+        institution_slug=inst_slug,
         email=user.email,
         first_name=user.first_name,
         last_name=user.last_name,
