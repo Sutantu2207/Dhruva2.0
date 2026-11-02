@@ -38,12 +38,17 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (hasMounted && !isLoading && !isAuthenticated) {
       router.replace('/login');
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [hasMounted, isLoading, isAuthenticated, router]);
 
   // Close mobile drawer on route transition
   useEffect(() => {
@@ -123,6 +128,13 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
         badge: 'Admin',
         roles: ['INSTITUTION_ADMIN', 'SUPER_ADMIN', 'HOD'],
       },
+      {
+        href: '/workspace/colleges',
+        label: 'Colleges Directory',
+        icon: Building,
+        badge: 'Coimbatore',
+        roles: ['INSTITUTION_ADMIN', 'SUPER_ADMIN'],
+      },
     ];
 
     if (isAdmin) return allItems;
@@ -145,10 +157,11 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
     if (pathname.startsWith('/workspace/ai')) return 'AI Assistant';
     if (pathname.startsWith('/workspace/analytics')) return 'Analytics';
     if (pathname.startsWith('/workspace/datacenter')) return 'Data Center';
+    if (pathname.startsWith('/workspace/colleges')) return 'Colleges Directory & Management';
     return 'Workspace';
   }, [pathname, filteredNavItems]);
 
-  if (isLoading) {
+  if (!hasMounted || isLoading || !user) {
     return (
       <div
         style={{
@@ -165,8 +178,6 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
       </div>
     );
   }
-
-  if (!user) return null;
 
   const sidebarContent = (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
@@ -300,7 +311,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
           size="sm"
           onClick={async () => {
             await logout();
-            router.push('/login');
+            window.location.href = '/login';
           }}
           style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
         >
@@ -312,7 +323,7 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
   );
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', backgroundColor: 'transparent' }}>
       {/* Skip to Main Content Link for WCAG Keyboard Nav */}
       <a href="#main-content" className="skip-link">
         Skip to main content
@@ -439,22 +450,6 @@ export default function WorkspaceLayout({ children }: { children: React.ReactNod
           {children}
         </main>
       </div>
-
-      <style jsx global>{`
-        @media (max-width: 1024px) {
-          .hidden-mobile {
-            display: none !important;
-          }
-          .visible-mobile {
-            display: flex !important;
-          }
-        }
-        @media (min-width: 1025px) {
-          .visible-mobile {
-            display: none !important;
-          }
-        }
-      `}</style>
     </div>
   );
 }

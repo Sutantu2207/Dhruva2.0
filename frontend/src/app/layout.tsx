@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { AuthProvider } from '@/lib/auth/AuthContext';
+import { InteractiveAmbientBackground } from '@/components/ui/InteractiveAmbientBackground';
+import { CosmicCompanion } from '@/components/ui/CosmicCompanion';
 
 export const metadata: Metadata = {
   title: 'Dhruva.AI — Institutional Intelligence Operating System',
@@ -14,10 +16,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
-        <div style={{ position: 'relative', minHeight: '100vh', backgroundColor: 'var(--bg-app)' }}>
-          <AuthProvider>{children}</AuthProvider>
+    <html lang="en" suppressHydrationWarning>
+      <body suppressHydrationWarning>
+        <div style={{ position: 'relative', minHeight: '100vh', backgroundColor: 'transparent' }}>
+          <InteractiveAmbientBackground />
+          <AuthProvider>
+            <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
+            <CosmicCompanion />
+          </AuthProvider>
         </div>
       </body>
     </html>

@@ -12,11 +12,13 @@ from src.interfaces.http.api.v1.ai import router as ai_router
 from src.interfaces.http.api.v1.mastery import router as mastery_router
 from src.interfaces.http.api.v1.placement import router as placement_router
 from src.interfaces.http.api.v1.platform import router as platform_router
+from src.interfaces.http.api.v1.colleges import router as colleges_router
 
 
 api_v1_router = APIRouter()
 api_v1_router.include_router(platform_router)
 api_v1_router.include_router(auth_router)
+api_v1_router.include_router(colleges_router)
 api_v1_router.include_router(institutions_router)
 api_v1_router.include_router(academic_router)
 api_v1_router.include_router(curriculum_router)

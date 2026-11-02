@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select, SelectOption } from '@/components/ui/Select';
+import { CollegeSelector } from '@/components/college/CollegeSelector';
+import { College } from '@/types/college';
 import { SystemRole } from '@/types/auth';
 
 interface InstitutionItem {
@@ -34,6 +36,9 @@ export default function SignupPage() {
   ]);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [selectedCollege, setSelectedCollege] = useState<College | null>(null);
+  const [customCollegeName, setCustomCollegeName] = useState('');
+  const [customCollegeLocation, setCustomCollegeLocation] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -118,6 +123,9 @@ export default function SignupPage() {
         phone: phone.trim() || undefined,
         role,
         institution_slug: institutionSlug,
+        college_id: selectedCollege ? selectedCollege.id : undefined,
+        custom_college_name: customCollegeName.trim() || undefined,
+        custom_college_location: customCollegeLocation.trim() || undefined,
         password,
       });
       window.location.href = '/workspace';
@@ -137,7 +145,7 @@ export default function SignupPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'var(--bg-app)',
+        backgroundColor: 'transparent',
         padding: '32px 16px',
       }}
     >
@@ -236,6 +244,24 @@ export default function SignupPage() {
                 disabled={isSubmitting}
               />
             </div>
+
+            {/* Coimbatore College Selection */}
+            <CollegeSelector
+              label="Select Your College (Coimbatore)"
+              selectedCollegeId={selectedCollege?.id}
+              onSelectCollege={(college) => {
+                setSelectedCollege(college);
+                if (college) {
+                  setCustomCollegeName('');
+                  setCustomCollegeLocation('');
+                }
+              }}
+              onCustomCollegeChange={(name, location) => {
+                setCustomCollegeName(name);
+                setCustomCollegeLocation(location);
+              }}
+              disabled={isSubmitting}
+            />
 
             <Input
               label="Phone Number (Optional)"

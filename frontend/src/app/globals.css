@@ -4,11 +4,11 @@
 */
 
 :root {
-  /* Surface & Background Hierarchy */
+  /* Surface & Background Hierarchy with Ambient Glassmorphism */
   --bg-app: #f8fafc;
-  --bg-surface: #ffffff;
-  --bg-surface-elevated: #ffffff;
-  --bg-surface-subtle: #f1f5f9;
+  --bg-surface: rgba(255, 255, 255, 0.92);
+  --bg-surface-elevated: rgba(255, 255, 255, 0.98);
+  --bg-surface-subtle: rgba(241, 245, 249, 0.82);
   --bg-overlay: rgba(15, 23, 42, 0.6);
 
   /* Precise Dividers & Borders (3:1 contrast against background) */
@@ -164,4 +164,40 @@ button, input, select, textarea {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* Responsive Display Utilities */
+@media (max-width: 1024px) {
+  .hidden-mobile {
+    display: none !important;
+  }
+  .visible-mobile {
+    display: flex !important;
+  }
+}
+@media (min-width: 1025px) {
+  .visible-mobile {
+    display: none !important;
+  }
+}
+
+/* Animation Keyframes */
+@keyframes wavingHand {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  50% {
+    transform: rotate(-24deg);
+  }
+}
+
+@keyframes popAndFade {
+  0% {
+    transform: scale(0.4) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.4) translateY(-40px);
+    opacity: 0;
+  }
 }

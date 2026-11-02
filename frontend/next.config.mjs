@@ -7,16 +7,13 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   async rewrites() {
-    const backendUrl = process.env.BACKEND_URL;
-    if (backendUrl) {
-      return [
-        {
-          source: '/api/:path*',
-          destination: `${backendUrl.replace(/\/+$/, '')}/api/:path*`,
-        },
-      ];
-    }
-    return [];
+    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8000';
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${backendUrl.replace(/\/+$/, '')}/api/:path*`,
+      },
+    ];
   },
   async headers() {
     return [

@@ -30,6 +30,9 @@ class UserResponse(BaseModel):
     id: uuid.UUID
     institution_id: Optional[uuid.UUID] = None
     institution_slug: Optional[str] = None
+    college_id: Optional[uuid.UUID] = None
+    college_name: Optional[str] = None
+    college_location: Optional[str] = None
     email: str
     first_name: str
     last_name: str
@@ -69,3 +72,6 @@ class RegisterUserRequest(BaseModel):
     role: SystemRole = SystemRole.STUDENT
     phone: Optional[str] = Field(default=None, max_length=32)
     institution_slug: Optional[str] = Field(default=None, description="Slug of the institution to register under")
+    college_id: Optional[uuid.UUID] = Field(default=None, description="Selected college UUID")
+    custom_college_name: Optional[str] = Field(default=None, description="Custom college name if not listed")
+    custom_college_location: Optional[str] = Field(default=None, description="Location of unlisted college")

@@ -34,9 +34,12 @@ import src.domain.mastery.models
 import src.domain.placement.models
 import src.domain.analytics.models
 import src.domain.ai.models
+import src.domain.college.models
 
 from src.core.logging import logger
 from src.core.security import hash_password
+from src.domain.college.models import College, CollegeRequest
+from src.infrastructure.coimbatore_colleges import COIMBATORE_COLLEGES
 from src.domain.academic.models import (
     AcademicYear,
     Batch,
@@ -88,8 +91,28 @@ async def init_schema(engine: AsyncEngine) -> None:
             except Exception as e:
                 logger.warning(f"Note: vector extension check: {e}")
 
-        # Create all tables defined across the 54 domain models
+        # Create all tables defined across the domain models
         await conn.run_sync(Base.metadata.create_all)
+
+        # Ensure college_id column exists on users and students for SQLite and PostgreSQL
+        if conn.dialect.name == "sqlite":
+            try:
+                await conn.execute(text("ALTER TABLE users ADD COLUMN college_id CHAR(32);"))
+            except Exception:
+                pass
+            try:
+                await conn.execute(text("ALTER TABLE students ADD COLUMN college_id CHAR(32);"))
+            except Exception:
+                pass
+        elif conn.dialect.name == "postgresql":
+            try:
+                await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS college_id UUID REFERENCES colleges(id) ON DELETE SET NULL;"))
+            except Exception:
+                pass
+            try:
+                await conn.execute(text("ALTER TABLE students ADD COLUMN IF NOT EXISTS college_id UUID REFERENCES colleges(id) ON DELETE SET NULL;"))
+            except Exception:
+                pass
     logger.info("Database schema verification and table creation complete.")
 
 
@@ -133,8 +156,45 @@ async def seed_all_data(session: AsyncSession) -> dict:
         session.add(inst)
         await session.flush()
 
-    # 3. Core Personas
-    logger.info("Seeding users and role mappings with FULL ACCESS for all personas...")
+    # 3. Comprehensive Coimbatore Colleges Directory
+    logger.info("Seeding comprehensive Coimbatore colleges directory...")
+    college_map = {}
+    for c_data in COIMBATORE_COLLEGES:
+        c_stmt = select(College).where(College.name == c_data["name"])
+        existing_col = (await session.execute(c_stmt)).scalar_one_or_none()
+        if not existing_col:
+            col = College(
+                id=uuid.uuid4(),
+                name=c_data["name"],
+                code=c_data.get("code"),
+                institution_type=c_data["institution_type"],
+                affiliated_university=c_data.get("affiliated_university"),
+                location=c_data["location"],
+                district=c_data.get("district", "Coimbatore"),
+                state=c_data.get("state", "Tamil Nadu"),
+                website=c_data.get("website"),
+                accreditation=c_data.get("accreditation"),
+                status=c_data.get("status", "ACTIVE"),
+            )
+            session.add(col)
+            college_map[c_data["name"]] = col
+        else:
+            existing_col.code = c_data.get("code")
+            existing_col.institution_type = c_data["institution_type"]
+            existing_col.affiliated_university = c_data.get("affiliated_university")
+            existing_col.location = c_data["location"]
+            existing_col.website = c_data.get("website")
+            existing_col.accreditation = c_data.get("accreditation")
+            college_map[c_data["name"]] = existing_col
+    await session.flush()
+    logger.info(f"Seeded {len(college_map)} accredited colleges across Coimbatore district.")
+
+    psg_tech = college_map.get("PSG College of Technology")
+    cit_cbe = college_map.get("Coimbatore Institute of Technology (CIT)")
+    kct_cbe = college_map.get("Kumaraguru College of Technology (KCT)")
+
+    # 4. Core Personas with Dedicated, Role-Segregated Permissions
+    logger.info("Seeding users and role mappings with dedicated permissions per persona...")
     hashed_pwd = hash_password(DEFAULT_SEED_PASSWORD)
 
     users_spec = [
@@ -143,42 +203,98 @@ async def seed_all_data(session: AsyncSession) -> dict:
             "first_name": "Super",
             "last_name": "Administrator",
             "inst_id": inst.id,
-        },
-        {
-            "email": "admin@iitb.ac.in",
-            "first_name": "Rajesh",
-            "last_name": "Sharma",
-            "inst_id": inst.id,
-        },
-        {
-            "email": "hod.cse@iitb.ac.in",
-            "first_name": "Anita",
-            "last_name": "Desai",
-            "inst_id": inst.id,
-        },
-        {
-            "email": "prof.verma@iitb.ac.in",
-            "first_name": "Vikram",
-            "last_name": "Verma",
-            "inst_id": inst.id,
-        },
-        {
-            "email": "rahul.k@iitb.ac.in",
-            "first_name": "Rahul",
-            "last_name": "Kumar",
-            "inst_id": inst.id,
-        },
-        {
-            "email": "placement@iitb.ac.in",
-            "first_name": "Sneha",
-            "last_name": "Kapoor",
-            "inst_id": inst.id,
+            "roles": [
+                SystemRole.SUPER_ADMIN.value,
+                SystemRole.INSTITUTION_ADMIN.value,
+                SystemRole.HOD.value,
+                SystemRole.FACULTY.value,
+                SystemRole.STUDENT.value,
+                SystemRole.PLACEMENT_OFFICER.value,
+            ],
         },
         {
             "email": "sutantu07@gmail.com",
             "first_name": "Sutantu",
             "last_name": "Admin",
             "inst_id": inst.id,
+            "roles": [
+                SystemRole.SUPER_ADMIN.value,
+                SystemRole.INSTITUTION_ADMIN.value,
+                SystemRole.HOD.value,
+                SystemRole.FACULTY.value,
+                SystemRole.STUDENT.value,
+                SystemRole.PLACEMENT_OFFICER.value,
+            ],
+        },
+        {
+            "email": "admin@iitb.ac.in",
+            "first_name": "Rajesh",
+            "last_name": "Sharma",
+            "inst_id": inst.id,
+            "roles": [SystemRole.INSTITUTION_ADMIN.value],
+        },
+        {
+            "email": "admin@dhruva.ai",
+            "first_name": "Rajesh",
+            "last_name": "Sharma",
+            "inst_id": inst.id,
+            "roles": [SystemRole.INSTITUTION_ADMIN.value],
+        },
+        {
+            "email": "hod.cse@iitb.ac.in",
+            "first_name": "Anita",
+            "last_name": "Desai",
+            "inst_id": inst.id,
+            "roles": [SystemRole.HOD.value],
+        },
+        {
+            "email": "hod@dhruva.ai",
+            "first_name": "Anita",
+            "last_name": "Desai",
+            "inst_id": inst.id,
+            "roles": [SystemRole.HOD.value],
+        },
+        {
+            "email": "prof.verma@iitb.ac.in",
+            "first_name": "Vikram",
+            "last_name": "Verma",
+            "inst_id": inst.id,
+            "roles": [SystemRole.FACULTY.value],
+        },
+        {
+            "email": "faculty@dhruva.ai",
+            "first_name": "Vikram",
+            "last_name": "Verma",
+            "inst_id": inst.id,
+            "roles": [SystemRole.FACULTY.value],
+        },
+        {
+            "email": "rahul.k@iitb.ac.in",
+            "first_name": "Rahul",
+            "last_name": "Kumar",
+            "inst_id": inst.id,
+            "roles": [SystemRole.STUDENT.value],
+        },
+        {
+            "email": "student@dhruva.ai",
+            "first_name": "Rahul",
+            "last_name": "Kumar",
+            "inst_id": inst.id,
+            "roles": [SystemRole.STUDENT.value],
+        },
+        {
+            "email": "placement@iitb.ac.in",
+            "first_name": "Sneha",
+            "last_name": "Kapoor",
+            "inst_id": inst.id,
+            "roles": [SystemRole.PLACEMENT_OFFICER.value],
+        },
+        {
+            "email": "placement@dhruva.ai",
+            "first_name": "Sneha",
+            "last_name": "Kapoor",
+            "inst_id": inst.id,
+            "roles": [SystemRole.PLACEMENT_OFFICER.value],
         },
     ]
 
@@ -186,12 +302,21 @@ async def seed_all_data(session: AsyncSession) -> dict:
     user_map = {}
 
     for spec in users_spec:
+        user_college_id = None
+        if "rahul" in spec["email"] or "student" in spec["email"] or "verma" in spec["email"] or "faculty" in spec["email"]:
+            user_college_id = psg_tech.id if psg_tech else None
+        elif "hod" in spec["email"]:
+            user_college_id = cit_cbe.id if cit_cbe else None
+        elif "admin" in spec["email"] or "placement" in spec["email"]:
+            user_college_id = kct_cbe.id if kct_cbe else None
+
         u_stmt = select(User).where(User.email == spec["email"])
         user = (await session.execute(u_stmt)).scalar_one_or_none()
         if not user:
             user = User(
                 id=uuid.uuid4(),
                 institution_id=spec["inst_id"],
+                college_id=user_college_id,
                 email=spec["email"],
                 password_hash=hashed_pwd,
                 first_name=spec["first_name"],
@@ -202,12 +327,29 @@ async def seed_all_data(session: AsyncSession) -> dict:
             await session.flush()
         else:
             user.institution_id = spec["inst_id"]
+            user.college_id = user_college_id
             user.password_hash = hashed_pwd
             user.status = "ACTIVE"
             await session.flush()
 
-        # Grant EVERY system role to the user so they have 100% full access across all platform modules
-        for role_obj in all_roles:
+        # Enforce exact role mapping for this persona:
+        target_role_codes = set(spec.get("roles", [SystemRole.STUDENT.value]))
+
+        # Remove existing roles that do not belong to this persona
+        existing_urs_stmt = select(UserRole).where(UserRole.user_id == user.id)
+        existing_urs = (await session.execute(existing_urs_stmt)).scalars().all()
+        for eur in existing_urs:
+            r_stmt = select(Role).where(Role.id == eur.role_id)
+            r_obj = (await session.execute(r_stmt)).scalar_one_or_none()
+            if not r_obj or r_obj.code not in target_role_codes:
+                await session.delete(eur)
+        await session.flush()
+
+        # Add designated roles
+        for r_code in target_role_codes:
+            role_obj = role_map.get(r_code)
+            if not role_obj:
+                continue
             ur_stmt = select(UserRole).where(
                 UserRole.user_id == user.id,
                 UserRole.role_id == role_obj.id,
@@ -223,29 +365,6 @@ async def seed_all_data(session: AsyncSession) -> dict:
                 session.add(ur)
 
         user_map[spec["email"]] = user
-
-    await session.flush()
-
-    # Ensure ALL other existing users in the database receive tenant link and all roles
-    all_users_stmt = select(User)
-    all_db_users = (await session.execute(all_users_stmt)).scalars().all()
-    for existing_user in all_db_users:
-        if not existing_user.institution_id:
-            existing_user.institution_id = inst.id
-        for role_obj in all_roles:
-            ur_check = select(UserRole).where(
-                UserRole.user_id == existing_user.id,
-                UserRole.role_id == role_obj.id,
-            )
-            if not (await session.execute(ur_check)).scalar_one_or_none():
-                session.add(
-                    UserRole(
-                        id=uuid.uuid4(),
-                        user_id=existing_user.id,
-                        role_id=role_obj.id,
-                        institution_id=inst.id,
-                    )
-                )
 
     await session.flush()
 
@@ -376,64 +495,73 @@ async def seed_all_data(session: AsyncSession) -> dict:
         await session.flush()
 
     # 7. Faculty & Student Profiles & Enrollments
-    fac_user = user_map["prof.verma@iitb.ac.in"]
-    fac_stmt = select(FacultyProfile).where(FacultyProfile.user_id == fac_user.id)
-    fac_profile = (await session.execute(fac_stmt)).scalar_one_or_none()
-    if not fac_profile:
-        fac_profile = FacultyProfile(
-            id=uuid.uuid4(),
-            user_id=fac_user.id,
-            institution_id=inst.id,
-            department_id=dept.id,
-            designation="Associate Professor",
-            employee_id="FAC-001",
-            status="ACTIVE",
-        )
-        session.add(fac_profile)
+    for fac_email in ["prof.verma@iitb.ac.in", "faculty@dhruva.ai"]:
+        fac_user = user_map.get(fac_email)
+        if not fac_user:
+            continue
+        fac_stmt = select(FacultyProfile).where(FacultyProfile.user_id == fac_user.id)
+        fac_profile = (await session.execute(fac_stmt)).scalar_one_or_none()
+        if not fac_profile:
+            fac_profile = FacultyProfile(
+                id=uuid.uuid4(),
+                user_id=fac_user.id,
+                institution_id=inst.id,
+                department_id=dept.id,
+                designation="Associate Professor",
+                employee_id=f"FAC-{str(fac_user.id)[:6].upper()}",
+                status="ACTIVE",
+            )
+            session.add(fac_profile)
 
-    ta_stmt = select(TeachingAssignment).where(
-        TeachingAssignment.course_offering_id == offering.id,
-        TeachingAssignment.faculty_user_id == fac_user.id,
-    )
-    if not (await session.execute(ta_stmt)).scalar_one_or_none():
-        ta = TeachingAssignment(
-            id=uuid.uuid4(),
-            course_offering_id=offering.id,
-            faculty_user_id=fac_user.id,
-            role_type="PRIMARY_INSTRUCTOR",
+        ta_stmt = select(TeachingAssignment).where(
+            TeachingAssignment.course_offering_id == offering.id,
+            TeachingAssignment.faculty_user_id == fac_user.id,
         )
-        session.add(ta)
+        if not (await session.execute(ta_stmt)).scalar_one_or_none():
+            ta = TeachingAssignment(
+                id=uuid.uuid4(),
+                course_offering_id=offering.id,
+                faculty_user_id=fac_user.id,
+                role_type="PRIMARY_INSTRUCTOR",
+            )
+            session.add(ta)
 
-    student_user = user_map["rahul.k@iitb.ac.in"]
-    stud_stmt = select(StudentProfile).where(StudentProfile.user_id == student_user.id)
-    stud_profile = (await session.execute(stud_stmt)).scalar_one_or_none()
-    if not stud_profile:
-        stud_profile = StudentProfile(
-            id=uuid.uuid4(),
-            user_id=student_user.id,
-            institution_id=inst.id,
-            department_id=dept.id,
-            program_id=prog.id,
-            batch_id=batch.id,
-            section_id=sec.id,
-            roll_number="26CSE001",
-            academic_status="ACTIVE",
-        )
-        session.add(stud_profile)
+    for idx, stud_email in enumerate(["rahul.k@iitb.ac.in", "student@dhruva.ai"], start=1):
+        student_user = user_map.get(stud_email)
+        if not student_user:
+            continue
+        stud_stmt = select(StudentProfile).where(StudentProfile.user_id == student_user.id)
+        stud_profile = (await session.execute(stud_stmt)).scalar_one_or_none()
+        if not stud_profile:
+            stud_profile = StudentProfile(
+                id=uuid.uuid4(),
+                user_id=student_user.id,
+                institution_id=inst.id,
+                college_id=psg_tech.id if psg_tech else None,
+                department_id=dept.id,
+                program_id=prog.id,
+                batch_id=batch.id,
+                section_id=sec.id,
+                roll_number=f"26CSE00{idx}",
+                academic_status="ACTIVE",
+            )
+            session.add(stud_profile)
+        else:
+            stud_profile.college_id = psg_tech.id if psg_tech else None
 
-    enr_stmt = select(StudentEnrollment).where(
-        StudentEnrollment.course_offering_id == offering.id,
-        StudentEnrollment.student_user_id == student_user.id,
-    )
-    if not (await session.execute(enr_stmt)).scalar_one_or_none():
-        enr = StudentEnrollment(
-            id=uuid.uuid4(),
-            institution_id=inst.id,
-            course_offering_id=offering.id,
-            student_user_id=student_user.id,
-            enrollment_status="ENROLLED",
+        enr_stmt = select(StudentEnrollment).where(
+            StudentEnrollment.course_offering_id == offering.id,
+            StudentEnrollment.student_user_id == student_user.id,
         )
-        session.add(enr)
+        if not (await session.execute(enr_stmt)).scalar_one_or_none():
+            enr = StudentEnrollment(
+                id=uuid.uuid4(),
+                institution_id=inst.id,
+                course_offering_id=offering.id,
+                student_user_id=student_user.id,
+                enrollment_status="ENROLLED",
+            )
+            session.add(enr)
     await session.flush()
 
     # 8. Curriculum, Modules & Lessons (for AI grounded tutoring)

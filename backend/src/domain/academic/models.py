@@ -451,6 +451,12 @@ class StudentProfile(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=True,
         index=True,
     )
+    college_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("colleges.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     roll_number: Mapped[str] = mapped_column(String(64), nullable=False)
     admission_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     academic_status: Mapped[str] = mapped_column(String(32), default="ACTIVE", nullable=False)
@@ -459,6 +465,7 @@ class StudentProfile(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     department: Mapped["Department"] = relationship("Department", back_populates="student_profiles", lazy="selectin")
     batch: Mapped[Optional["Batch"]] = relationship("Batch", back_populates="student_profiles", lazy="selectin")
     section: Mapped[Optional["Section"]] = relationship("Section", back_populates="student_profiles", lazy="selectin")
+    college: Mapped[Optional["src.domain.college.models.College"]] = relationship("College", foreign_keys=[college_id], lazy="selectin")
 
     __table_args__ = (
         UniqueConstraint("institution_id", "roll_number", name="uq_student_inst_roll"),

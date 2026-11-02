@@ -20,7 +20,12 @@ function getApiBaseUrl(): string {
     return clean.endsWith('/api/v1') ? clean : `${clean}/api/v1`;
   }
 
-  // 3. Client-side browser runtime under Vercel Services (same-origin relative path rewritten to backend service)
+  // 3. Localhost development environment
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:8000/api/v1';
+  }
+
+  // 4. Client-side browser runtime under Vercel Services (same-origin relative path rewritten to backend service)
   return '/api/v1';
 }
 

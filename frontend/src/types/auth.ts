@@ -24,6 +24,9 @@ export interface User {
   id: string;
   institution_id?: string | null;
   institution_slug?: string | null;
+  college_id?: string | null;
+  college_name?: string | null;
+  college_location?: string | null;
   email: string;
   first_name: string;
   last_name: string;
@@ -59,4 +62,7 @@ export interface RegisterData {
   phone?: string;
   role?: SystemRole;
   institution_slug?: string;
+  college_id?: string;
+  custom_college_name?: string;
+  custom_college_location?: string;
 }

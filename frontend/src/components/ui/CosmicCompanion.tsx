@@ -327,28 +327,6 @@ export const CosmicCompanion: React.FC = () => {
           </svg>
         </div>
       </div>
-
-      {/* Global Embedded Styles for Hand Waving and Pop Particle */}
-      <style jsx global>{`
-        @keyframes wavingHand {
-          0%, 100% {
-            transform: rotate(0deg);
-          }
-          50% {
-            transform: rotate(-24deg);
-          }
-        }
-        @keyframes popAndFade {
-          0% {
-            transform: scale(0.4) translateY(0);
-            opacity: 1;
-          }
-          100% {
-            transform: scale(1.4) translateY(-40px);
-            opacity: 0;
-          }
-        }
-      `}</style>
     </>
   );
 };

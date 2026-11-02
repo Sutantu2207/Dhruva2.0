@@ -51,7 +51,7 @@ export default function LoginPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: 'var(--bg-app)',
+        backgroundColor: 'transparent',
         padding: '24px',
       }}
     >
@@ -146,52 +146,39 @@ export default function LoginPage() {
         {/* Quick Institutional Sign-In Shortcuts */}
         <div
           style={{
-            padding: '12px 16px',
+            padding: '16px',
             borderRadius: 'var(--radius-md)',
-            background: 'rgba(255, 255, 255, 0.04)',
+            backgroundColor: 'var(--bg-surface)',
             border: '1px solid var(--border-subtle)',
+            boxShadow: 'var(--shadow-sm)',
             fontSize: '12px',
           }}
         >
-          <div style={{ color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 500 }}>
-            Quick Institutional Sign-In:
+          <div style={{ color: 'var(--text-secondary)', marginBottom: '10px', fontWeight: 600, fontSize: '12px' }}>
+            Quick Role-Segregated Sign-In:
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             <button
               type="button"
               onClick={() => {
-                setEmail('admin@iitb.ac.in');
+                setEmail('rahul.k@iitb.ac.in');
                 setPassword('SecurePass123!');
               }}
               style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid var(--border-subtle)',
+                background: email === 'rahul.k@iitb.ac.in' ? 'var(--brand-primary-subtle)' : 'var(--bg-surface-subtle)',
+                border: email === 'rahul.k@iitb.ac.in' ? '1px solid var(--brand-primary)' : '1px solid var(--border-subtle)',
                 borderRadius: '6px',
-                padding: '4px 8px',
-                fontSize: '11px',
-                color: 'var(--text-primary)',
+                padding: '6px 10px',
+                fontSize: '12px',
+                fontWeight: 500,
+                color: email === 'rahul.k@iitb.ac.in' ? 'var(--brand-primary)' : 'var(--text-primary)',
                 cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
               }}
             >
-              Admin (IITB)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEmail('hod.cse@iitb.ac.in');
-                setPassword('SecurePass123!');
-              }}
-              style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid var(--border-subtle)',
-                borderRadius: '6px',
-                padding: '4px 8px',
-                fontSize: '11px',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-              }}
-            >
-              HOD (Anita Desai)
+              🎓 Student (Rahul K.)
             </button>
             <button
               type="button"
@@ -200,34 +187,42 @@ export default function LoginPage() {
                 setPassword('SecurePass123!');
               }}
               style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid var(--border-subtle)',
+                background: email === 'prof.verma@iitb.ac.in' ? 'var(--brand-primary-subtle)' : 'var(--bg-surface-subtle)',
+                border: email === 'prof.verma@iitb.ac.in' ? '1px solid var(--brand-primary)' : '1px solid var(--border-subtle)',
                 borderRadius: '6px',
-                padding: '4px 8px',
-                fontSize: '11px',
-                color: 'var(--text-primary)',
+                padding: '6px 10px',
+                fontSize: '12px',
+                fontWeight: 500,
+                color: email === 'prof.verma@iitb.ac.in' ? 'var(--brand-primary)' : 'var(--text-primary)',
                 cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
               }}
             >
-              Faculty (Prof. Verma)
+              👨‍🏫 Faculty (Prof. Verma)
             </button>
             <button
               type="button"
               onClick={() => {
-                setEmail('rahul.k@iitb.ac.in');
+                setEmail('hod.cse@iitb.ac.in');
                 setPassword('SecurePass123!');
               }}
               style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid var(--border-subtle)',
+                background: email === 'hod.cse@iitb.ac.in' ? 'var(--brand-primary-subtle)' : 'var(--bg-surface-subtle)',
+                border: email === 'hod.cse@iitb.ac.in' ? '1px solid var(--brand-primary)' : '1px solid var(--border-subtle)',
                 borderRadius: '6px',
-                padding: '4px 8px',
-                fontSize: '11px',
-                color: 'var(--text-primary)',
+                padding: '6px 10px',
+                fontSize: '12px',
+                fontWeight: 500,
+                color: email === 'hod.cse@iitb.ac.in' ? 'var(--brand-primary)' : 'var(--text-primary)',
                 cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
               }}
             >
-              Student (Rahul K.)
+              🏛️ HOD (Anita Desai)
             </button>
             <button
               type="button"
@@ -236,16 +231,42 @@ export default function LoginPage() {
                 setPassword('SecurePass123!');
               }}
               style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid var(--border-subtle)',
+                background: email === 'placement@iitb.ac.in' ? 'var(--brand-primary-subtle)' : 'var(--bg-surface-subtle)',
+                border: email === 'placement@iitb.ac.in' ? '1px solid var(--brand-primary)' : '1px solid var(--border-subtle)',
                 borderRadius: '6px',
-                padding: '4px 8px',
-                fontSize: '11px',
-                color: 'var(--text-primary)',
+                padding: '6px 10px',
+                fontSize: '12px',
+                fontWeight: 500,
+                color: email === 'placement@iitb.ac.in' ? 'var(--brand-primary)' : 'var(--text-primary)',
                 cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
               }}
             >
-              Placement (Sneha K.)
+              💼 Placement (Sneha K.)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEmail('admin@iitb.ac.in');
+                setPassword('SecurePass123!');
+              }}
+              style={{
+                background: email === 'admin@iitb.ac.in' ? 'var(--brand-primary-subtle)' : 'var(--bg-surface-subtle)',
+                border: email === 'admin@iitb.ac.in' ? '1px solid var(--brand-primary)' : '1px solid var(--border-subtle)',
+                borderRadius: '6px',
+                padding: '6px 10px',
+                fontSize: '12px',
+                fontWeight: 500,
+                color: email === 'admin@iitb.ac.in' ? 'var(--brand-primary)' : 'var(--text-primary)',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              🏢 Admin (IITB)
             </button>
             <button
               type="button"
@@ -254,16 +275,20 @@ export default function LoginPage() {
                 setPassword('SecurePass123!');
               }}
               style={{
-                background: 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid var(--border-subtle)',
+                background: email === 'superadmin@dhruva.ai' ? 'var(--brand-primary-subtle)' : 'var(--bg-surface-subtle)',
+                border: email === 'superadmin@dhruva.ai' ? '1px solid var(--brand-primary)' : '1px solid var(--border-subtle)',
                 borderRadius: '6px',
-                padding: '4px 8px',
-                fontSize: '11px',
-                color: 'var(--text-primary)',
+                padding: '6px 10px',
+                fontSize: '12px',
+                fontWeight: 500,
+                color: email === 'superadmin@dhruva.ai' ? 'var(--brand-primary)' : 'var(--text-primary)',
                 cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
               }}
             >
-              Super Admin
+              ⚡ Super Admin
             </button>
           </div>
         </div>

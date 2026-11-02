@@ -60,6 +60,12 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=True,
         index=True,
     )
+    college_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("colleges.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     first_name: Mapped[str] = mapped_column(String(128), nullable=False)
@@ -71,6 +77,7 @@ class User(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     # Relationships
     institution: Mapped[Optional["Institution"]] = relationship("Institution", back_populates="users", lazy="selectin")
+    college: Mapped[Optional["src.domain.college.models.College"]] = relationship("College", foreign_keys=[college_id], lazy="selectin")
     user_roles: Mapped[List["UserRole"]] = relationship(
         "UserRole",
         back_populates="user",

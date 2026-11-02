@@ -19,19 +19,9 @@ interface AuthContextType extends AuthState {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = localStorage.getItem('dhruva_user');
-        return stored ? JSON.parse(stored) : null;
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  });
+  const [user, setUser] = useState<User | null>(null);
   const [institution, setInstitution] = useState<Institution | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   const clearError = useCallback(() => {
@@ -57,7 +47,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    // Check session on initial load if token exists
+    try {
+      const stored = localStorage.getItem('dhruva_user');
+      if (stored) {
+        setUser(JSON.parse(stored));
+      }
+    } catch {
+      // Ignore parse errors
+    } finally {
+      setIsLoading(false);
+    }
+
+    // Refresh profile with backend in background
     refreshProfile();
   }, [refreshProfile]);
 
@@ -116,6 +117,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setInstitution(null);
       if (typeof window !== 'undefined') {
         localStorage.removeItem('dhruva_user');
+        localStorage.removeItem('dhruva_token');
+        sessionStorage.clear();
       }
     }
   };

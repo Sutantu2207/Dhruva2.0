@@ -86,6 +86,47 @@ async def _resolve_institution_slug(user: User, session: AsyncSession) -> Option
     return "iit-bombay"
 
 
+async def _build_user_response(user: User, session: AsyncSession) -> UserResponse:
+    """Build unified UserResponse DTO with tenant, roles, and college attributes."""
+    from src.domain.college.models import College
+    from src.infrastructure.repositories.user_repository import UserRepository
+
+    repo = UserRepository(session)
+    perms = await repo.get_user_permissions(user.id)
+    roles = [ur.role.code for ur in user.user_roles if ur.role]
+    inst_slug = await _resolve_institution_slug(user, session)
+
+    college_name = None
+    college_location = None
+    if getattr(user, "college", None):
+        college_name = user.college.name
+        college_location = user.college.location
+    elif getattr(user, "college_id", None):
+        col = await session.get(College, user.college_id)
+        if col:
+            college_name = col.name
+            college_location = col.location
+
+    return UserResponse(
+        id=user.id,
+        institution_id=user.institution_id,
+        institution_slug=inst_slug,
+        college_id=user.college_id,
+        college_name=college_name,
+        college_location=college_location,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        full_name=user.full_name,
+        phone=user.phone,
+        status=user.status,
+        roles=roles,
+        permissions=list(perms),
+        last_login_at=user.last_login_at,
+        created_at=user.created_at,
+    )
+
+
 @router.get(
     "/institutions",
     response_model=ApiResponse[List[InstitutionResponse]],
@@ -163,30 +204,37 @@ async def register(
         request_id=request_id,
     )
 
+    # 2b. Associate selected college or submit unlisted college request
+    if payload.college_id:
+        from src.domain.college.models import College
+        col = await session.get(College, payload.college_id)
+        if col:
+            created_user.college_id = col.id
+            from src.domain.academic.models import StudentProfile
+            s_stmt = select(StudentProfile).where(StudentProfile.user_id == created_user.id)
+            sp = (await session.execute(s_stmt)).scalar_one_or_none()
+            if sp:
+                sp.college_id = col.id
+            await session.commit()
+    elif payload.custom_college_name and payload.custom_college_name.strip():
+        from src.domain.college.models import CollegeRequest
+        req_obj = CollegeRequest(
+            id=uuid.uuid4(),
+            user_id=created_user.id,
+            requester_name=created_user.full_name,
+            requester_email=created_user.email,
+            college_name=payload.custom_college_name.strip(),
+            location=payload.custom_college_location.strip() if payload.custom_college_location else "Coimbatore",
+            status="PENDING",
+        )
+        session.add(req_obj)
+        await session.commit()
+
     # 3. Issue session tokens
     access_token, refresh_token, expires_in = await auth_service.issue_tokens(created_user)
     _set_auth_cookies(response, access_token, refresh_token)
 
-    roles = [ur.role.code for ur in created_user.user_roles if ur.role]
-    perms = list(get_permissions_for_role(payload.role))
-
-    inst_slug = await _resolve_institution_slug(created_user, session)
-    user_dto = UserResponse(
-        id=created_user.id,
-        institution_id=created_user.institution_id,
-        institution_slug=inst_slug,
-        email=created_user.email,
-        first_name=created_user.first_name,
-        last_name=created_user.last_name,
-        full_name=created_user.full_name,
-        phone=created_user.phone,
-        status=created_user.status,
-        roles=roles,
-        permissions=perms,
-        last_login_at=created_user.last_login_at,
-        created_at=created_user.created_at,
-    )
-
+    user_dto = await _build_user_response(created_user, session)
     data = LoginResponseData(
         user=user_dto,
         access_token=access_token,
@@ -225,29 +273,7 @@ async def login(
     )
 
     _set_auth_cookies(response, access_token, refresh_token)
-
-    repo = UserRepository(session)
-    perms = await repo.get_user_permissions(user.id)
-    roles = [ur.role.code for ur in user.user_roles if ur.role]
-
-    inst_slug = await _resolve_institution_slug(user, session)
-
-    user_dto = UserResponse(
-        id=user.id,
-        institution_id=user.institution_id,
-        institution_slug=inst_slug,
-        email=user.email,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        full_name=user.full_name,
-        phone=user.phone,
-        status=user.status,
-        roles=roles,
-        permissions=list(perms),
-        last_login_at=user.last_login_at,
-        created_at=user.created_at,
-    )
-
+    user_dto = await _build_user_response(user, session)
     data = LoginResponseData(
         user=user_dto,
         access_token=access_token,
@@ -288,28 +314,7 @@ async def refresh_token(
 
     _set_auth_cookies(response, new_access_token, new_refresh_token)
 
-    repo = UserRepository(session)
-    perms = await repo.get_user_permissions(user.id)
-    roles = [ur.role.code for ur in user.user_roles if ur.role]
-
-    inst_slug = await _resolve_institution_slug(user, session)
-
-    user_dto = UserResponse(
-        id=user.id,
-        institution_id=user.institution_id,
-        institution_slug=inst_slug,
-        email=user.email,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        full_name=user.full_name,
-        phone=user.phone,
-        status=user.status,
-        roles=roles,
-        permissions=list(perms),
-        last_login_at=user.last_login_at,
-        created_at=user.created_at,
-    )
-
+    user_dto = await _build_user_response(user, session)
     data = RefreshResponseData(
         user=user_dto,
         access_token=new_access_token,
@@ -361,25 +366,5 @@ async def get_me(
     from src.infrastructure.seed import ensure_db_initialized
     await ensure_db_initialized(session)
 
-    repo = UserRepository(session)
-    perms = await repo.get_user_permissions(user.id)
-    roles = [ur.role.code for ur in user.user_roles if ur.role]
-
-    inst_slug = await _resolve_institution_slug(user, session)
-
-    user_dto = UserResponse(
-        id=user.id,
-        institution_id=user.institution_id,
-        institution_slug=inst_slug,
-        email=user.email,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        full_name=user.full_name,
-        phone=user.phone,
-        status=user.status,
-        roles=roles,
-        permissions=list(perms),
-        last_login_at=user.last_login_at,
-        created_at=user.created_at,
-    )
+    user_dto = await _build_user_response(user, session)
     return build_response(data=user_dto, request=request)

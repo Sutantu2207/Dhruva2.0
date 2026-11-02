@@ -17,6 +17,8 @@ import {
   DepartmentalMetric,
   InstitutionalAnalytics,
 } from '@/types/analytics';
+import { CollegeAnalytics } from '@/types/college';
+import { Building2, MapPin, GraduationCap } from 'lucide-react';
 
 export default function AnalyticsInterventionsWorkspace() {
   const { user } = useAuth();
@@ -26,9 +28,28 @@ export default function AnalyticsInterventionsWorkspace() {
   const isAdmin = ['SUPER_ADMIN', 'INSTITUTION_ADMIN', 'HOD'].includes(primaryRole);
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'executive' | 'early_warning' | 'interventions' | 'notifications'>(
+  const [activeTab, setActiveTab] = useState<'executive' | 'early_warning' | 'interventions' | 'notifications' | 'colleges'>(
     isStaff ? 'executive' : 'interventions'
   );
+
+  // College-Wise Analytics State
+  const [collegeAnalytics, setCollegeAnalytics] = useState<CollegeAnalytics[]>([]);
+  const [isLoadingCollegeAnalytics, setIsLoadingCollegeAnalytics] = useState(false);
+  const [collegeSearchQuery, setCollegeSearchQuery] = useState('');
+  const [collegeTypeFilter, setCollegeTypeFilter] = useState('ALL');
+
+  const fetchCollegeAnalytics = async () => {
+    setIsLoadingCollegeAnalytics(true);
+    try {
+      const data = await api.get<CollegeAnalytics[]>('/analytics/college-wise');
+      setCollegeAnalytics(data || []);
+    } catch (err) {
+      console.error('Failed to load college analytics', err);
+      setCollegeAnalytics([]);
+    } finally {
+      setIsLoadingCollegeAnalytics(false);
+    }
+  };
 
   // Rollups & Health State
   const [isRefreshingRollup, setIsRefreshingRollup] = useState(false);
@@ -422,6 +443,17 @@ export default function AnalyticsInterventionsWorkspace() {
           onClick={() => setActiveTab('notifications')}
         >
           Notification Hub ({notifications.filter((n) => !n.is_read).length} unread)
+        </Button>
+
+        <Button
+          variant={activeTab === 'colleges' ? 'primary' : 'outline'}
+          size="sm"
+          onClick={() => {
+            setActiveTab('colleges');
+            fetchCollegeAnalytics();
+          }}
+        >
+          Coimbatore College Analytics
         </Button>
       </div>
 
@@ -1122,6 +1154,238 @@ export default function AnalyticsInterventionsWorkspace() {
               ))
             )}
           </div>
+        </div>
+      )}
+
+      {/* TAB 5: COIMBATORE COLLEGE ANALYTICS */}
+      {activeTab === 'colleges' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          
+          {/* Quick Stats Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+            <Card style={{ padding: '20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
+                Total Institutions Monitored
+              </div>
+              <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--brand-primary)', marginTop: '4px' }}>
+                {collegeAnalytics.length}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                Accredited Colleges in Coimbatore
+              </div>
+            </Card>
+
+            <Card style={{ padding: '20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
+                Active Enrolled Students
+              </div>
+              <div style={{ fontSize: '28px', fontWeight: 800, color: 'var(--status-success)', marginTop: '4px' }}>
+                {collegeAnalytics.reduce((acc, c) => acc + (c.enrolled_students || 0), 0)}
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                Across registered cohorts
+              </div>
+            </Card>
+
+            <Card style={{ padding: '20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
+                Average Career Readiness (CRI)
+              </div>
+              <div style={{ fontSize: '28px', fontWeight: 800, color: '#3b82f6', marginTop: '4px' }}>
+                {collegeAnalytics.length > 0
+                  ? Math.round(
+                      collegeAnalytics.reduce((acc, c) => acc + (c.career_readiness_avg || 0), 0) /
+                        (collegeAnalytics.filter((c) => (c.career_readiness_avg || 0) > 0).length || 1)
+                    )
+                  : 0}
+                %
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                Multi-dimensional competence score
+              </div>
+            </Card>
+
+            <Card style={{ padding: '20px' }}>
+              <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>
+                Avg Assessment Completion
+              </div>
+              <div style={{ fontSize: '28px', fontWeight: 800, color: '#8b5cf6', marginTop: '4px' }}>
+                {collegeAnalytics.length > 0
+                  ? Math.round(
+                      collegeAnalytics.reduce((acc, c) => acc + (c.assessment_completion_rate || 0), 0) /
+                        (collegeAnalytics.filter((c) => (c.assessment_completion_rate || 0) > 0).length || 1)
+                    )
+                  : 0}
+                %
+              </div>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                Curriculum &amp; exam milestones
+              </div>
+            </Card>
+          </div>
+
+          {/* Filter Bar & Analytics Table Card */}
+          <Card style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  Institutional Cohort Performance &amp; Career Readiness
+                </h3>
+                <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  College-wise comparative analysis of student enrollment, readiness indexes, and completion metrics.
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  placeholder="Filter college by name or area..."
+                  value={collegeSearchQuery}
+                  onChange={(e) => setCollegeSearchQuery(e.target.value)}
+                  style={{
+                    padding: '7px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-default)',
+                    backgroundColor: 'var(--bg-app)',
+                    fontSize: '12px',
+                    color: 'var(--text-primary)',
+                    minWidth: '220px',
+                  }}
+                />
+
+                <select
+                  value={collegeTypeFilter}
+                  onChange={(e) => setCollegeTypeFilter(e.target.value)}
+                  style={{
+                    padding: '7px 12px',
+                    borderRadius: 'var(--radius-md)',
+                    border: '1px solid var(--border-default)',
+                    backgroundColor: 'var(--bg-app)',
+                    fontSize: '12px',
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <option value="ALL">All Verticals</option>
+                  <option value="Engineering &amp; Technology">Engineering</option>
+                  <option value="Arts &amp; Science">Arts &amp; Science</option>
+                  <option value="Medical">Medical</option>
+                  <option value="Dental">Dental</option>
+                  <option value="Nursing">Nursing</option>
+                  <option value="Management">Management</option>
+                  <option value="Polytechnic">Polytechnic</option>
+                  <option value="University">University</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div style={{ overflowX: 'auto', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ backgroundColor: 'var(--bg-surface-subtle)', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <th style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-secondary)' }}>Institution</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-secondary)' }}>Vertical</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-secondary)' }}>Location</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-secondary)' }}>Enrolled Students</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-secondary)', minWidth: '180px' }}>Career Readiness (CRI)</th>
+                    <th style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-secondary)', minWidth: '180px' }}>Assessment Completion</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoadingCollegeAnalytics ? (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '36px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        Aggregating institutional metrics across Coimbatore district...
+                      </td>
+                    </tr>
+                  ) : (
+                    collegeAnalytics
+                      .filter((c) => {
+                        const matchesSearch = !collegeSearchQuery.trim() ||
+                          c.college_name.toLowerCase().includes(collegeSearchQuery.toLowerCase()) ||
+                          c.location.toLowerCase().includes(collegeSearchQuery.toLowerCase());
+                        const matchesType = collegeTypeFilter === 'ALL' || c.institution_type === collegeTypeFilter;
+                        return matchesSearch && matchesType;
+                      })
+                      .map((row) => (
+                        <tr
+                          key={row.college_id}
+                          style={{
+                            borderBottom: '1px solid var(--border-subtle)',
+                            transition: 'background-color 0.15s',
+                          }}
+                        >
+                          <td style={{ padding: '12px 16px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span>{row.college_name}</span>
+                              {row.college_code && (
+                                <span style={{ fontFamily: 'monospace', fontSize: '11px', color: 'var(--text-muted)' }}>
+                                  ({row.college_code})
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <Badge variant="outline" size="sm">
+                              {row.institution_type}
+                            </Badge>
+                          </td>
+                          <td style={{ padding: '12px 16px', color: 'var(--text-secondary)', fontSize: '12px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <MapPin size={11} color="var(--text-muted)" />
+                              <span>{row.location}</span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 16px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                            {row.enrolled_students}
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ flex: 1, height: '8px', backgroundColor: 'var(--bg-surface-subtle)', borderRadius: '4px', overflow: 'hidden' }}>
+                                <div
+                                  style={{
+                                    height: '100%',
+                                    width: `${Math.min(row.career_readiness_avg, 100)}%`,
+                                    backgroundColor:
+                                      row.career_readiness_avg >= 75
+                                        ? 'var(--status-success)'
+                                        : row.career_readiness_avg >= 50
+                                        ? '#3b82f6'
+                                        : 'var(--status-warning)',
+                                    borderRadius: '4px',
+                                  }}
+                                />
+                              </div>
+                              <span style={{ fontSize: '12px', fontWeight: 600, minWidth: '36px' }}>
+                                {row.career_readiness_avg}%
+                              </span>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ flex: 1, height: '8px', backgroundColor: 'var(--bg-surface-subtle)', borderRadius: '4px', overflow: 'hidden' }}>
+                                <div
+                                  style={{
+                                    height: '100%',
+                                    width: `${Math.min(row.assessment_completion_rate, 100)}%`,
+                                    backgroundColor: '#8b5cf6',
+                                    borderRadius: '4px',
+                                  }}
+                                />
+                              </div>
+                              <span style={{ fontSize: '12px', fontWeight: 600, minWidth: '36px' }}>
+                                {row.assessment_completion_rate}%
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </Card>
         </div>
       )}
 

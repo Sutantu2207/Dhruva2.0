@@ -7,10 +7,16 @@ import { useAuth } from '@/lib/auth/AuthContext';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
+import { Dialog } from '@/components/ui/Dialog';
+import { CollegeSelector } from '@/components/college/CollegeSelector';
+import { College } from '@/types/college';
 import { api } from '@/lib/api/client';
 import { Course } from '@/types/academic';
 import { Assessment } from '@/types/assessment';
 import {
+  Building2,
+  Edit2,
+  CheckCircle2,
   BookOpen,
   FileCheck2,
   Zap,
@@ -34,7 +40,7 @@ import {
 
 export default function PurposefulWorkspaceDashboard() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const tenantSlug = user?.institution_slug || '';
   const primaryRole = user?.roles?.[0] || 'STUDENT';
 
@@ -44,6 +50,30 @@ export default function PurposefulWorkspaceDashboard() {
   useEffect(() => {
     setActiveRoleView(primaryRole);
   }, [primaryRole]);
+
+  // College Selection Modal State
+  const [isCollegeModalOpen, setIsCollegeModalOpen] = useState(false);
+  const [selectedCollegeForUpdate, setSelectedCollegeForUpdate] = useState<College | null>(null);
+  const [isSavingCollege, setIsSavingCollege] = useState(false);
+  const [collegeSaveSuccess, setCollegeSaveSuccess] = useState(false);
+
+  const handleUpdateCollege = async () => {
+    if (!selectedCollegeForUpdate) return;
+    setIsSavingCollege(true);
+    try {
+      await api.put('/auth/profile/college', { college_id: selectedCollegeForUpdate.id });
+      await refreshProfile();
+      setCollegeSaveSuccess(true);
+      setTimeout(() => {
+        setCollegeSaveSuccess(false);
+        setIsCollegeModalOpen(false);
+      }, 900);
+    } catch (err) {
+      console.error('Failed to update college', err);
+    } finally {
+      setIsSavingCollege(false);
+    }
+  };
 
   // Live Data States
   const [courses, setCourses] = useState<Course[]>([]);
@@ -127,6 +157,54 @@ export default function PurposefulWorkspaceDashboard() {
               ? 'Discover verified student talent, review capstone evidence, and track Career Readiness Index.'
               : 'Institutional Administration: Infrastructure health, user provisioning, and Data Center bulk ingestion.'}
           </p>
+
+          {/* Institutional / Coimbatore College Identity Banner */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                backgroundColor: 'rgba(79, 70, 229, 0.08)',
+                borderRadius: '6px',
+                border: '1px solid rgba(79, 70, 229, 0.2)',
+                fontSize: '12px',
+                color: '#4338ca',
+                fontWeight: 600,
+              }}
+            >
+              <Building2 size={13} color="#4f46e5" />
+              <span>{user?.college_name || 'College Not Assigned'}</span>
+              {user?.college_location && (
+                <span style={{ color: '#6366f1', fontWeight: 500 }}>• {user.college_location}</span>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCollegeForUpdate(null);
+                setIsCollegeModalOpen(true);
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                padding: '4px 8px',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--brand-primary)',
+                backgroundColor: 'var(--bg-surface-subtle)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: '6px',
+                cursor: 'pointer',
+              }}
+            >
+              <Edit2 size={11} />
+              {user?.college_name ? 'Change College' : 'Select College'}
+            </button>
+          </div>
         </div>
 
         {/* Multi-role View Switcher */}
@@ -698,6 +776,44 @@ export default function PurposefulWorkspaceDashboard() {
           </div>
         </div>
       )}
+
+      {/* College Update Modal Dialog */}
+      <Dialog
+        isOpen={isCollegeModalOpen}
+        onClose={() => setIsCollegeModalOpen(false)}
+        title="Update College Affiliation"
+        description="Select your college in Coimbatore, Tamil Nadu. Your career readiness and department benchmarks will be linked to this institution."
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsCollegeModalOpen(false)}
+              disabled={isSavingCollege}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleUpdateCollege}
+              disabled={!selectedCollegeForUpdate || isSavingCollege}
+              isLoading={isSavingCollege}
+            >
+              {collegeSaveSuccess ? 'Saved Affiliation!' : 'Save Affiliation'}
+            </Button>
+          </div>
+        }
+      >
+        <div style={{ padding: '8px 0', minHeight: '320px' }}>
+          <CollegeSelector
+            label="Search Accredited Coimbatore Colleges"
+            selectedCollegeId={selectedCollegeForUpdate?.id || user?.college_id}
+            onSelectCollege={(c) => setSelectedCollegeForUpdate(c)}
+            disabled={isSavingCollege}
+          />
+        </div>
+      </Dialog>
 
     </div>
   );
