@@ -117,8 +117,8 @@ class Settings(BaseSettings):
                 return v.replace("postgres://", "postgresql+asyncpg://", 1)
             if v.startswith("postgresql://") and not v.startswith("postgresql+"):
                 return v.replace("postgresql://", "postgresql+asyncpg://", 1)
-            # In Vercel serverless, root directory is read-only; redirect local SQLite to writable /tmp
-            if os.environ.get("VERCEL") and v.startswith("sqlite+aiosqlite:///./"):
+            # In Vercel serverless / AWS Lambda, root directory is read-only; redirect local SQLite to writable /tmp
+            if (os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")) and v.startswith("sqlite"):
                 return "sqlite+aiosqlite:////tmp/dhruva_dev.db"
         return v
 

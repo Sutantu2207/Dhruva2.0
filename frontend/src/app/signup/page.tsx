@@ -20,7 +20,7 @@ interface InstitutionItem {
 
 export default function SignupPage() {
   const router = useRouter();
-  const { register, isLoading, error } = useAuth();
+  const { register, isLoading, error, clearError } = useAuth();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -37,6 +37,7 @@ export default function SignupPage() {
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
+    clearError();
     let isMounted = true;
     api
       .get<InstitutionItem[]>('/auth/institutions')
@@ -56,7 +57,7 @@ export default function SignupPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [clearError]);
 
   const roleOptions: SelectOption[] = [
     { value: 'STUDENT', label: 'Student (Learner & Assessment Taker)' },
@@ -79,6 +80,26 @@ export default function SignupPage() {
 
     if (password.length < 8) {
       setFormError('Password must be at least 8 characters long.');
+      return;
+    }
+
+    if (!/[A-Z]/.test(password)) {
+      setFormError('Password must contain at least one uppercase letter (A-Z).');
+      return;
+    }
+
+    if (!/[a-z]/.test(password)) {
+      setFormError('Password must contain at least one lowercase letter (a-z).');
+      return;
+    }
+
+    if (!/\d/.test(password)) {
+      setFormError('Password must contain at least one number (0-9).');
+      return;
+    }
+
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+      setFormError('Password must contain at least one special character (!@#$%^&*).');
       return;
     }
 
@@ -222,7 +243,8 @@ export default function SignupPage() {
             <Input
               label="Password"
               type="password"
-              placeholder="Minimum 8 characters"
+              placeholder="e.g. SecurePass123!"
+              helperText="Must be 8+ chars with uppercase, lowercase, number, and special character (!@#$%)."
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={isLoading}

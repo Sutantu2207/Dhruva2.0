@@ -86,15 +86,53 @@ class HttpClient {
       return {} as T;
     }
 
-    const data = await response.json();
+    let data: any = null;
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      try {
+        data = await response.json();
+      } catch {
+        data = null;
+      }
+    } else {
+      try {
+        const text = await response.text();
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = { message: text || response.statusText };
+        }
+      } catch {
+        data = null;
+      }
+    }
 
-    if (!response.ok || data.success === false) {
-      const err = data as ApiErrorResponse;
-      const errorBody: ErrorBody = err.error || {
-        code: 'HTTP_ERROR',
-        message: response.statusText || 'Request failed',
-        details: [],
-        request_id: 'req_client_unknown',
+    if (!response.ok || (data && data.success === false)) {
+      let errorMessage = response.statusText || 'Request failed';
+      let errorCode = 'HTTP_ERROR';
+      let details: Array<{ field?: string; issue: string }> = [];
+
+      if (data) {
+        if (data.error) {
+          errorMessage = data.error.message || errorMessage;
+          errorCode = data.error.code || errorCode;
+          details = data.error.details || [];
+        } else if (data.detail) {
+          errorMessage = typeof data.detail === 'string'
+            ? data.detail
+            : Array.isArray(data.detail)
+            ? data.detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ')
+            : JSON.stringify(data.detail);
+        } else if (data.message) {
+          errorMessage = data.message;
+        }
+      }
+
+      const errorBody: ErrorBody = {
+        code: errorCode,
+        message: errorMessage,
+        details,
+        request_id: data?.request_id || 'req_client_unknown',
       };
       throw new ApiError(errorBody, response.status);
     }

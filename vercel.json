@@ -5,7 +5,7 @@
     "backend": {
       "root": "backend",
       "framework": "fastapi",
-      "entrypoint": "src.main:app"
+      "entrypoint": "main:app"
     },
     "frontend": {
       "root": "frontend",

@@ -96,6 +96,9 @@ async def list_institutions(
     session: AsyncSession = Depends(get_db_session),
 ) -> ApiResponse[List[InstitutionResponse]]:
     """List available institutions for registration and onboarding."""
+    from src.infrastructure.seed import ensure_db_initialized
+    await ensure_db_initialized(session)
+
     repo = InstitutionRepository(session)
     insts = await repo.list_all(limit=100)
     data = [InstitutionResponse.model_validate(inst) for inst in insts if inst.status == "ACTIVE"]
@@ -115,6 +118,9 @@ async def register(
     session: AsyncSession = Depends(get_db_session),
 ) -> ApiResponse[LoginResponseData]:
     """Register a new student or faculty account, issue session tokens, and set secure cookies."""
+    from src.infrastructure.seed import ensure_db_initialized
+    await ensure_db_initialized(session)
+
     auth_service = AuthService(session)
     inst_repo = InstitutionRepository(session)
     request_id = get_request_id(request)
@@ -124,8 +130,12 @@ async def register(
     if payload.institution_slug:
         inst = await inst_repo.get_by_slug(payload.institution_slug)
         if not inst:
-            raise AuthenticationError(f"Institution '{payload.institution_slug}' not found", code="INSTITUTION_NOT_FOUND")
-        institution_id = inst.id
+            inst = await inst_repo.get_by_slug("iit-bombay")
+            if not inst:
+                active_insts = await inst_repo.list_all(limit=1)
+                inst = active_insts[0] if active_insts else None
+        if inst:
+            institution_id = inst.id
     else:
         # Try domain match
         domain = payload.email.split("@")[-1].lower()
@@ -133,10 +143,13 @@ async def register(
         if inst:
             institution_id = inst.id
         else:
-            # Fallback to first active institution
-            active_insts = await inst_repo.list_all(limit=1)
-            if active_insts:
-                institution_id = active_insts[0].id
+            # Fallback to first active institution or iit-bombay
+            inst = await inst_repo.get_by_slug("iit-bombay")
+            if not inst:
+                active_insts = await inst_repo.list_all(limit=1)
+                inst = active_insts[0] if active_insts else None
+            if inst:
+                institution_id = inst.id
 
     # 2. Register user
     created_user = await auth_service.register_user(
@@ -195,6 +208,9 @@ async def login(
     session: AsyncSession = Depends(get_db_session),
 ) -> ApiResponse[LoginResponseData]:
     """Authenticate with email and password. Issues JWT access token and rotating refresh token."""
+    from src.infrastructure.seed import ensure_db_initialized
+    await ensure_db_initialized(session)
+
     auth_service = AuthService(session)
     request_id = get_request_id(request)
     client_ip = request.client.host if request.client else None
@@ -342,6 +358,9 @@ async def get_me(
     session: AsyncSession = Depends(get_db_session),
 ) -> ApiResponse[UserResponse]:
     """Retrieve identity, tenant membership, roles, and active permissions of caller."""
+    from src.infrastructure.seed import ensure_db_initialized
+    await ensure_db_initialized(session)
+
     repo = UserRepository(session)
     perms = await repo.get_user_permissions(user.id)
     roles = [ur.role.code for ur in user.user_roles if ur.role]

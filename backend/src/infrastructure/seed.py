@@ -642,3 +642,20 @@ async def auto_initialize_and_seed() -> None:
             await seed_all_data(session)
     except Exception as e:
         logger.error(f"Auto-initialize and seed encountered error: {e}", exc_info=True)
+
+
+_is_initialized = False
+
+
+async def ensure_db_initialized(session: AsyncSession) -> None:
+    """Ensure schema tables and foundational seeds exist even if ASGI lifespan was bypassed by serverless adapters."""
+    global _is_initialized
+    if _is_initialized:
+        return
+    try:
+        from src.infrastructure.persistence.postgres.database import engine
+        await init_schema(engine)
+        await seed_all_data(session)
+        _is_initialized = True
+    except Exception as e:
+        logger.warning(f"ensure_db_initialized notice: {e}")
