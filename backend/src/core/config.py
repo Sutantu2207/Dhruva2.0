@@ -138,9 +138,12 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
         """Fail-fast validator: Staging and Production must not run with default or insecure secrets."""
+        import os
+        is_vercel = bool(os.environ.get("VERCEL"))
+        if is_vercel or self.ENVIRONMENT in (EnvironmentType.PRODUCTION, EnvironmentType.STAGING):
+            self.COOKIE_SECURE = True
+
         if self.ENVIRONMENT in (EnvironmentType.PRODUCTION, EnvironmentType.STAGING):
-            import os
-            is_vercel = bool(os.environ.get("VERCEL"))
             if "dev_" in self.SECRET_KEY or len(self.SECRET_KEY) < 32:
                 if is_vercel:
                     self.SECRET_KEY = "prod_vercel_fallback_super_secure_key_min_32_chars"

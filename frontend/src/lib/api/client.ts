@@ -43,8 +43,41 @@ export class ApiError extends Error {
 class HttpClient {
   private token: string | null = null;
 
+  constructor() {
+    if (typeof window !== 'undefined') {
+      try {
+        this.token = localStorage.getItem('dhruva_token');
+      } catch {
+        this.token = null;
+      }
+    }
+  }
+
   setToken(token: string | null) {
     this.token = token;
+    if (typeof window !== 'undefined') {
+      try {
+        if (token) {
+          localStorage.setItem('dhruva_token', token);
+        } else {
+          localStorage.removeItem('dhruva_token');
+        }
+      } catch {
+        // Ignore storage errors in restricted contexts
+      }
+    }
+  }
+
+  getToken(): string | null {
+    if (this.token) return this.token;
+    if (typeof window !== 'undefined') {
+      try {
+        this.token = localStorage.getItem('dhruva_token');
+      } catch {
+        // Ignore storage errors
+      }
+    }
+    return this.token;
   }
 
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -69,8 +102,9 @@ class HttpClient {
       headers['Content-Type'] = 'application/json';
     }
 
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
+    const currentToken = this.getToken();
+    if (currentToken) {
+      headers['Authorization'] = `Bearer ${currentToken}`;
     }
 
     const config: RequestInit = {

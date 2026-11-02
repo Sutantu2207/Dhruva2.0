@@ -17,6 +17,7 @@ Ensures:
 
 import logging
 import os
+from typing import Optional
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from sqlalchemy import select, text
@@ -647,15 +648,19 @@ async def auto_initialize_and_seed() -> None:
 _is_initialized = False
 
 
-async def ensure_db_initialized(session: AsyncSession) -> None:
+async def ensure_db_initialized(session: Optional[AsyncSession] = None) -> None:
     """Ensure schema tables and foundational seeds exist even if ASGI lifespan was bypassed by serverless adapters."""
     global _is_initialized
     if _is_initialized:
         return
     try:
-        from src.infrastructure.persistence.postgres.database import engine
+        from src.infrastructure.persistence.postgres.database import engine, AsyncSessionFactory
         await init_schema(engine)
-        await seed_all_data(session)
+        if session is not None:
+            await seed_all_data(session)
+        else:
+            async with AsyncSessionFactory() as init_session:
+                await seed_all_data(init_session)
         _is_initialized = True
     except Exception as e:
         logger.warning(f"ensure_db_initialized notice: {e}")

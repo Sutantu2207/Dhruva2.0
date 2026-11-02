@@ -19,9 +19,19 @@ interface AuthContextType extends AuthState {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('dhruva_user');
+        return stored ? JSON.parse(stored) : null;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
   const [institution, setInstitution] = useState<Institution | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const clearError = useCallback(() => {
@@ -29,19 +39,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshProfile = useCallback(async () => {
+    const token = api.getToken();
+    if (!token) return;
     try {
-      setIsLoading(true);
       const userProfile = await api.get<User>('/auth/me');
       setUser(userProfile);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('dhruva_user', JSON.stringify(userProfile));
+      }
     } catch {
+      api.setToken(null);
       setUser(null);
-    } finally {
-      setIsLoading(false);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('dhruva_user');
+      }
     }
   }, []);
 
   useEffect(() => {
-    // Check session on initial load
+    // Check session on initial load if token exists
     refreshProfile();
   }, [refreshProfile]);
 
@@ -52,6 +68,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await api.post<LoginResponseData>('/auth/login', { email, password });
       api.setToken(result.access_token);
       setUser(result.user);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('dhruva_user', JSON.stringify(result.user));
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -71,6 +90,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const result = await api.post<LoginResponseData>('/auth/register', data);
       api.setToken(result.access_token);
       setUser(result.user);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('dhruva_user', JSON.stringify(result.user));
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setError(err.message);
@@ -92,6 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       api.setToken(null);
       setUser(null);
       setInstitution(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('dhruva_user');
+      }
     }
   };
 

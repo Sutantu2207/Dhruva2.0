@@ -18,25 +18,27 @@ export default function LoginPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    clearError();
-  }, [clearError]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+    clearError();
 
-    if (!email.trim() || !password.trim()) {
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+
+    if (!cleanEmail || !cleanPassword) {
       setFormError('Please enter both your institutional email and password.');
       return;
     }
 
     try {
       setIsSubmitting(true);
-      await login(email.trim(), password);
-      router.push('/workspace');
-    } catch (err) {
-      // Error handled in AuthContext
+      await login(cleanEmail, cleanPassword);
+      window.location.href = '/workspace';
+    } catch (err: any) {
+      console.error('Sign-in error:', err);
+      const msg = err?.message || 'Authentication failed. Please check your credentials or network connection.';
+      setFormError(msg);
     } finally {
       setIsSubmitting(false);
     }

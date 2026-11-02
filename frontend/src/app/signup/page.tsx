@@ -38,7 +38,6 @@ export default function SignupPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    clearError();
     let isMounted = true;
     api
       .get<InstitutionItem[]>('/auth/institutions')
@@ -58,7 +57,7 @@ export default function SignupPage() {
     return () => {
       isMounted = false;
     };
-  }, [clearError]);
+  }, []);
 
   const roleOptions: SelectOption[] = [
     { value: 'STUDENT', label: 'Student (Learner & Assessment Taker)' },
@@ -68,6 +67,7 @@ export default function SignupPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
+    clearError();
 
     if (!firstName.trim() || !lastName.trim()) {
       setFormError('Please enter both your first and last name.');
@@ -120,9 +120,11 @@ export default function SignupPage() {
         institution_slug: institutionSlug,
         password,
       });
-      router.push('/workspace');
-    } catch {
-      // Error handled in AuthContext
+      window.location.href = '/workspace';
+    } catch (err: any) {
+      console.error('Registration error:', err);
+      const msg = err?.message || 'Registration failed. Please check your details.';
+      setFormError(msg);
     } finally {
       setIsSubmitting(false);
     }
