@@ -69,6 +69,23 @@ async def readiness_check(
     return build_response(data=data, request=request)
 
 
+@router.post("/seed", summary="Initialize and Seed Database")
+@router.get("/seed", summary="Initialize and Seed Database")
+async def trigger_seed(request: Request) -> ApiResponse[Dict[str, Any]]:
+    """On-demand endpoint to run table creation and foundational data seeding."""
+    from src.infrastructure.persistence.postgres.database import engine, AsyncSessionFactory
+    from src.infrastructure.seed import init_schema, seed_all_data
+
+    await init_schema(engine)
+    async with AsyncSessionFactory() as session:
+        result = await seed_all_data(session)
+
+    return build_response(
+        data={"status": "SEEDED", "result": result},
+        request=request,
+    )
+
+
 @router.post(
     "/institutions",
     response_model=ApiResponse[InstitutionResponse],

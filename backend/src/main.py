@@ -28,6 +28,11 @@ setup_logging(service_name=settings.SERVICE_NAME, debug=settings.DEBUG)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application startup and shutdown lifecycle management."""
     logger.info("Initializing Dhruva.AI V2 Core Application Engine...")
+    try:
+        from src.infrastructure.seed import auto_initialize_and_seed
+        await auto_initialize_and_seed()
+    except Exception as exc:
+        logger.warning(f"Database auto-initialization check skipped/failed: {exc}")
     yield
     logger.info("Shutting down Dhruva.AI V2 Core Application Engine...")
     from src.infrastructure.persistence.postgres.database import engine
