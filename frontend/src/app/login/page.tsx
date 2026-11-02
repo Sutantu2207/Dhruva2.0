@@ -11,11 +11,12 @@ import { Input } from '@/components/ui/Input';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading, error, clearError } = useAuth();
+  const { login, error, clearError } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     clearError();
@@ -31,10 +32,13 @@ export default function LoginPage() {
     }
 
     try {
-      await login(email, password);
+      setIsSubmitting(true);
+      await login(email.trim(), password);
       router.push('/workspace');
-    } catch {
+    } catch (err) {
       // Error handled in AuthContext
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -102,7 +106,7 @@ export default function LoginPage() {
               placeholder="e.g. user@institution.edu"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              disabled={isLoading}
+              disabled={isSubmitting}
               required
               autoFocus
             />
@@ -113,7 +117,7 @@ export default function LoginPage() {
               placeholder="••••••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
+              disabled={isSubmitting}
               required
             />
 
@@ -121,7 +125,8 @@ export default function LoginPage() {
               type="submit"
               variant="primary"
               size="md"
-              isLoading={isLoading}
+              isLoading={isSubmitting}
+              disabled={isSubmitting}
               style={{ width: '100%', marginTop: '4px' }}
             >
               Sign In to Workspace

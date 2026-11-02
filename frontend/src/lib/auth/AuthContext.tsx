@@ -4,7 +4,7 @@
  * Dhruva.AI V2 — Authentication Context & Session Provider
  */
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api/client';
 import { AuthState, Institution, LoginResponseData, RegisterData, User } from '@/types/auth';
 
@@ -24,10 +24,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refreshProfile = async () => {
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
     try {
       setIsLoading(true);
-      setError(null);
       const userProfile = await api.get<User>('/auth/me');
       setUser(userProfile);
     } catch {
@@ -35,12 +38,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     // Check session on initial load
     refreshProfile();
-  }, []);
+  }, [refreshProfile]);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -104,7 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         logout,
         refreshProfile,
-        clearError: () => setError(null),
+        clearError,
       }}
     >
       {children}

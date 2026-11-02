@@ -20,7 +20,7 @@ interface InstitutionItem {
 
 export default function SignupPage() {
   const router = useRouter();
-  const { register, isLoading, error, clearError } = useAuth();
+  const { register, error, clearError } = useAuth();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -35,6 +35,7 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     clearError();
@@ -109,6 +110,7 @@ export default function SignupPage() {
     }
 
     try {
+      setIsSubmitting(true);
       await register({
         first_name: firstName.trim(),
         last_name: lastName.trim(),
@@ -121,6 +123,8 @@ export default function SignupPage() {
       router.push('/workspace');
     } catch {
       // Error handled in AuthContext
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -189,7 +193,7 @@ export default function SignupPage() {
                 placeholder="e.g. Rahul"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                disabled={isLoading}
+                disabled={isSubmitting}
                 required
                 autoFocus
               />
@@ -198,7 +202,7 @@ export default function SignupPage() {
                 placeholder="e.g. Kumar"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                disabled={isLoading}
+                disabled={isSubmitting}
                 required
               />
             </div>
@@ -209,7 +213,7 @@ export default function SignupPage() {
               placeholder="e.g. student@iitb.ac.in"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              disabled={isLoading}
+              disabled={isSubmitting}
               required
             />
 
@@ -220,14 +224,14 @@ export default function SignupPage() {
                 options={institutionOptions}
                 value={institutionSlug}
                 onChange={(e) => setInstitutionSlug(e.target.value)}
-                disabled={isLoading}
+                disabled={isSubmitting}
               />
               <Select
                 label="Role"
                 options={roleOptions}
                 value={role}
                 onChange={(e) => setRole(e.target.value as SystemRole)}
-                disabled={isLoading}
+                disabled={isSubmitting}
               />
             </div>
 
@@ -237,7 +241,7 @@ export default function SignupPage() {
               placeholder="e.g. +91 98765 43210"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              disabled={isLoading}
+              disabled={isSubmitting}
             />
 
             <Input
@@ -247,7 +251,7 @@ export default function SignupPage() {
               helperText="Must be 8+ chars with uppercase, lowercase, number, and special character (!@#$%)."
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              disabled={isLoading}
+              disabled={isSubmitting}
               required
             />
 
@@ -257,7 +261,7 @@ export default function SignupPage() {
               placeholder="Re-enter your password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              disabled={isLoading}
+              disabled={isSubmitting}
               required
             />
 
@@ -265,7 +269,8 @@ export default function SignupPage() {
               type="submit"
               variant="primary"
               size="md"
-              isLoading={isLoading}
+              isLoading={isSubmitting}
+              disabled={isSubmitting}
               style={{ width: '100%', marginTop: '6px' }}
             >
               Register &amp; Enter Workspace
