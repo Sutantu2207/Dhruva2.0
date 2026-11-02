@@ -5,15 +5,23 @@
 import { ApiErrorResponse, ApiResponse, ErrorBody } from '@/types/api';
 
 function getApiBaseUrl(): string {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (!envUrl) {
-    return 'http://localhost:8000/api/v1';
+  // 1. Server-side runtime (Next.js Functions, SSR, Server Components):
+  // Reads internal service URL injected via Vercel service binding (BACKEND_URL)
+  if (typeof window === 'undefined') {
+    const serverUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const clean = serverUrl.trim().replace(/\/+$/, '');
+    return clean.endsWith('/api/v1') ? clean : `${clean}/api/v1`;
   }
-  const clean = envUrl.trim().replace(/\/+$/, '');
-  if (!clean.endsWith('/api/v1')) {
-    return `${clean}/api/v1`;
+
+  // 2. Client-side browser runtime with explicit external API URL override
+  const clientUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (clientUrl) {
+    const clean = clientUrl.trim().replace(/\/+$/, '');
+    return clean.endsWith('/api/v1') ? clean : `${clean}/api/v1`;
   }
-  return clean;
+
+  // 3. Client-side browser runtime under Vercel Services (same-origin relative path rewritten to backend service)
+  return '/api/v1';
 }
 
 export class ApiError extends Error {
