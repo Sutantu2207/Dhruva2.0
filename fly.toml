@@ -37,3 +37,4 @@ primary_region = "sin" # Singapore (Lowest latency for India/Asia users)
   method = "GET"
   timeout = "5s"
   path = "/health/live"
+

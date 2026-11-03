@@ -1,22 +1,20 @@
 # ==============================================================================
-# Dhruva.AI V2 — Render Infrastructure Blueprint (render.yaml)
-# Target Deployment: Render (FastAPI Web Service + PostgreSQL 16 + Redis)
-# Note: Zero Railway Dependency. Standard vendor-neutral infrastructure manifest.
+# Dhruva.AI V2 — Render Production Infrastructure Blueprint (render.yaml)
+# Free Tier Optimized | Native Docker Runtime | Managed PostgreSQL 16
 # ==============================================================================
 
 services:
   # ----------------------------------------------------------------------------
-  # 1. Primary API Backend Web Service
+  # 1. Primary FastAPI Intelligence Backend
   # ----------------------------------------------------------------------------
   - type: web
     name: dhruva-backend
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    plan: standard
-    region: oregon
+    plan: free
+    region: singapore # Lowest latency for India / Coimbatore
     healthCheckPath: /health/live
-    preDeployCommand: alembic upgrade head
     autoDeploy: true
     envVars:
       - key: ENVIRONMENT
@@ -36,22 +34,13 @@ services:
       - key: JWT_ALGORITHM
         value: HS256
       - key: ACCESS_TOKEN_EXPIRE_MINUTES
-        value: 15
+        value: 60
       - key: REFRESH_TOKEN_EXPIRE_DAYS
-        value: 7
+        value: 14
       - key: REDIS_ENABLED
-        value: true
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: dhruva-redis
-          property: connectionString
+        value: false
       - key: CORS_ORIGINS
-        value: "https://dhruva.vercel.app,https://*.vercel.app"
-      - key: COOKIE_SECURE
-        value: true
-      - key: COOKIE_SAMESITE
-        value: none
+        value: "*"
       - key: ARGON2_TIME_COST
         value: 3
       - key: ARGON2_MEMORY_COST
@@ -59,23 +48,14 @@ services:
       - key: ARGON2_PARALLELISM
         value: 4
 
-  # ----------------------------------------------------------------------------
-  # 2. Redis Cache & Token Bucket Rate Limiter
-  # ----------------------------------------------------------------------------
-  - type: redis
-    name: dhruva-redis
-    region: oregon
-    plan: starter
-    ipAllowList: [] # Strict private network isolation inside Render
-
 # ------------------------------------------------------------------------------
-# 3. Managed PostgreSQL 16 Database with pgvector
+# 2. Managed PostgreSQL 16 Database with Automated Provisioning
 # ------------------------------------------------------------------------------
 databases:
   - name: dhruva-postgres
-    region: oregon
     databaseName: dhruva_db
     user: dhruva_admin
-    plan: standard
+    plan: free
+    region: singapore
     postgresMajorVersion: "16"
-    ipAllowList: [] # Private network only; external access through Render dashboard
+    ipAllowList: [] # Private network isolation inside Render cloud

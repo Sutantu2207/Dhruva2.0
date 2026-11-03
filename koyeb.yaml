@@ -47,3 +47,4 @@ services:
         value: "14"
       - key: CORS_ORIGINS
         value: "*"
+
