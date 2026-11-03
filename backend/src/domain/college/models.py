@@ -60,3 +60,4 @@ class CollegeRequest(Base, UUIDPrimaryKeyMixin, TimestampMixin):
 
     def __repr__(self) -> str:
         return f"<CollegeRequest(college='{self.college_name}', status='{self.status}')>"
+

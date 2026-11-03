@@ -100,3 +100,4 @@ class CollegeAnalyticsItem(BaseModel):
 class UpdateUserCollegeRequest(BaseModel):
     """Student profile update payload for selected college."""
     college_id: uuid.UUID
+

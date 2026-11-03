@@ -808,3 +808,4 @@ COIMBATORE_COLLEGES: List[Dict[str, Any]] = [
         "status": "ACTIVE",
     },
 ]
+

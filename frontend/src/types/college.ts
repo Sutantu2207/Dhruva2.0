@@ -64,3 +64,4 @@ export interface CollegeCreatePayload {
   accreditation?: string;
   status?: string;
 }
+

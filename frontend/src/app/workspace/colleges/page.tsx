@@ -969,3 +969,4 @@ export default function CollegesManagementPage() {
     </div>
   );
 }
+

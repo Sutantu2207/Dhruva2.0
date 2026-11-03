@@ -3,3 +3,4 @@
 from src.domain.college.models import College, CollegeRequest
 
 __all__ = ["College", "CollegeRequest"]
+
