@@ -1,11 +1,11 @@
 # ==============================================================================
 # Dhruva.AI V2 — Render Production Infrastructure Blueprint (render.yaml)
-# Free Tier Optimized | Native Docker Runtime | Managed PostgreSQL 16
+# Free Tier Web Service with Self-Contained Auto-Seeded Database (Zero DB Limit)
 # ==============================================================================
 
 services:
   # ----------------------------------------------------------------------------
-  # 1. Primary FastAPI Intelligence Backend
+  # 1. Primary FastAPI Intelligence Backend (Free Web Service)
   # ----------------------------------------------------------------------------
   - type: web
     name: dhruva-backend
@@ -26,9 +26,7 @@ services:
       - key: PORT
         value: 8000
       - key: DATABASE_URL
-        fromDatabase:
-          name: dhruva-postgres
-          property: connectionString
+        value: "sqlite+aiosqlite:///./dhruva_dev.db"
       - key: SECRET_KEY
         generateValue: true
       - key: JWT_ALGORITHM
@@ -47,15 +45,3 @@ services:
         value: 65536
       - key: ARGON2_PARALLELISM
         value: 4
-
-# ------------------------------------------------------------------------------
-# 2. Managed PostgreSQL 16 Database with Automated Provisioning
-# ------------------------------------------------------------------------------
-databases:
-  - name: dhruva-postgres
-    databaseName: dhruva_db
-    user: dhruva_admin
-    plan: free
-    region: singapore
-    postgresMajorVersion: "16"
-    ipAllowList: [] # Private network isolation inside Render cloud
