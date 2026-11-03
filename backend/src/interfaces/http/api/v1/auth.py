@@ -10,6 +10,7 @@ Implements:
 """
 
 from typing import List, Optional
+import uuid
 from fastapi import APIRouter, Cookie, Depends, Header, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
