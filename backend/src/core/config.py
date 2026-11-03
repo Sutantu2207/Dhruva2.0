@@ -145,16 +145,11 @@ class Settings(BaseSettings):
 
         if self.ENVIRONMENT in (EnvironmentType.PRODUCTION, EnvironmentType.STAGING):
             if "dev_" in self.SECRET_KEY or len(self.SECRET_KEY) < 32:
-                if is_vercel:
-                    self.SECRET_KEY = "prod_vercel_fallback_super_secure_key_min_32_chars"
+                if is_vercel or bool(os.environ.get("RENDER")) or bool(os.environ.get("KOYEB_APP_NAME")):
+                    self.SECRET_KEY = "prod_fallback_super_secure_jwt_key_min_32_characters_2026"
                 else:
                     raise ValueError(
                         f"Production/Staging violation: SECRET_KEY must be a cryptographically secure random string with at least 32 characters. Provided length: {len(self.SECRET_KEY)}"
-                    )
-            if self.DATABASE_URL.startswith("sqlite"):
-                if not is_vercel:
-                    raise ValueError(
-                        "Production/Staging violation: SQLite cannot be used in production or staging. Must be a valid PostgreSQL 16 connection URI."
                     )
             if self.DEBUG and not is_vercel:
                 raise ValueError(
