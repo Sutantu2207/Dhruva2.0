@@ -1,0 +1,49 @@
+# ==============================================================================
+# Dhruva.AI V2 — Koyeb Cloud Deployment Blueprint (koyeb.yaml)
+# Free 24/7 Web Service with Native Docker Execution
+# ==============================================================================
+
+name: dhruva-ai
+services:
+  # ----------------------------------------------------------------------------
+  # 1. FastAPI Intelligence Backend
+  # ----------------------------------------------------------------------------
+  - name: dhruva-backend
+    type: web
+    git:
+      repository: Sutantu2207/Dhruva2.0
+      branch: master
+      workdir: backend
+    docker:
+      dockerfile: Dockerfile
+    ports:
+      - port: 8000
+        path: /
+    routes:
+      - path: /
+    regions:
+      - sin # Singapore (low latency for India)
+    instance_type: nano
+    health_checks:
+      - http:
+          path: /health/live
+          port: 8000
+        interval: 30
+        timeout: 5
+    env:
+      - key: PORT
+        value: "8000"
+      - key: ENVIRONMENT
+        value: "production"
+      - key: DATABASE_URL
+        value: "sqlite+aiosqlite:///dhruva_dev.db"
+      - key: SECRET_KEY
+        value: "dhruva-koyeb-production-jwt-secret-key-2026-v2"
+      - key: JWT_ALGORITHM
+        value: "HS256"
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "60"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "14"
+      - key: CORS_ORIGINS
+        value: "*"

@@ -55,7 +55,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS if isinstance(settings.CORS_ORIGINS, list) else [settings.CORS_ORIGINS],
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.koyeb\.app|https://.*\.fly\.dev|http://localhost:\d+",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],

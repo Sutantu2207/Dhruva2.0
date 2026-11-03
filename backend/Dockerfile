@@ -64,9 +64,10 @@ COPY alembic.ini ./
 COPY alembic ./alembic
 COPY src ./src
 
-# Set secure permissions ensuring non-root user owns the application directory
-RUN chown -R appuser:appgroup /app && \
-    chmod -R 755 /app
+# Set secure permissions ensuring non-root user owns the application directory and persistent volume
+RUN mkdir -p /data && \
+    chown -R appuser:appgroup /app /data && \
+    chmod -R 775 /app /data
 
 # Drop root privileges
 USER 10001
