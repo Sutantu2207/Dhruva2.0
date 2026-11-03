@@ -22,11 +22,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy pyproject.toml to install project dependencies
-COPY pyproject.toml .
+# Copy pyproject.toml and requirements.txt to install project dependencies
+COPY pyproject.toml requirements.txt* ./
 
 # Upgrade pip and install wheel packages into /install prefix
 RUN pip install --upgrade pip setuptools wheel && \
+    pip install --prefix=/install "greenlet>=3.0.3" "sqlalchemy[asyncio]>=2.0.30" && \
     pip install --prefix=/install .
 
 # ------------------------------------------------------------------------------
