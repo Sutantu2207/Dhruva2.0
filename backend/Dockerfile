@@ -33,7 +33,7 @@ COPY pyproject.toml requirements.txt ./
 
 # Install pip dependencies with explicit C-extension compilation
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install "greenlet>=3.0.3" "sqlalchemy[asyncio]>=2.0.30" && \
+    pip install "greenlet>=3.0.3" "sqlalchemy[asyncio]>=2.0.30" "email-validator>=2.0.0" && \
     pip install -r requirements.txt && \
     pip install .
 
